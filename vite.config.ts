@@ -6,14 +6,41 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://10.100.18.37:8080',
+      // user_server routes (port 8088)
+      '/api/v1/login': {
+        target: 'http://localhost:8088',
         changeOrigin: true,
       },
+      '/api/v1/user': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
+      '/api/v1/token': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
+      '/api/v1/jwt': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
+      '/api/v1/organization': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
+      '/api/v1/organizations': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
+      // casdoor
       '/casdoor': {
-        target: 'http://10.100.18.37:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/casdoor/, ''),
+      },
+      // main server (catch-all)
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
       },
     },
   },
