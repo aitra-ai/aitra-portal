@@ -69,9 +69,9 @@ const auth = useAuthStore()
 const currentLang = ref(locale.value)
 
 const navItems = [
-  { to: '/models', label: 'nav.models', icon: 'ChatDotRound' },
-  { to: '/apikeys', label: 'nav.apikeys', icon: 'Key' },
-  { to: '/openclaw', label: 'nav.openclaw', icon: 'Grid' },
+  { to: '/app/models', label: 'nav.models', icon: 'ChatDotRound' },
+  { to: '/app/apikeys', label: 'nav.apikeys', icon: 'Key' },
+  { to: '/app/openclaw', label: 'nav.openclaw', icon: 'Grid' },
 ]
 
 const avatarLetter = computed(() =>

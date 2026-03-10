@@ -5,15 +5,27 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/',
+      name: 'home',
+      component: () => import('../views/HomeView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
       meta: { public: true },
     },
     {
-      path: '/',
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/RegisterView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/app',
       component: () => import('../views/LayoutView.vue'),
-      redirect: '/models',
+      redirect: '/app/models',
       children: [
         {
           path: 'models',
@@ -32,18 +44,14 @@ const router = createRouter({
         },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/models' },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (!to.meta.public && !auth.isLoggedIn) {
-    return '/login'
-  }
-  if (to.path === '/login' && auth.isLoggedIn) {
-    return '/models'
-  }
+  if (!to.meta.public && !auth.isLoggedIn) return '/login'
+  if ((to.path === '/login' || to.path === '/register') && auth.isLoggedIn) return '/app/models'
 })
 
 export default router
