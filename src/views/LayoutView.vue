@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -78,11 +79,20 @@ const auth = useAuthStore()
 
 const currentLang = ref(locale.value)
 
-const navItems = [
+const baseNavItems = [
   { to: '/app/models', label: 'nav.models', icon: 'ChatDotRound' },
+  { to: '/app/deployments', label: 'nav.deployments', icon: 'Monitor' },
   { to: '/app/apikeys', label: 'nav.apikeys', icon: 'Key' },
   { to: '/app/openclaw', label: 'nav.openclaw', icon: 'Grid' },
 ]
+
+const adminNavItems = [
+  { to: '/admin/services', label: 'nav.adminServices', icon: 'Tools' },
+]
+
+const navItems = computed(() =>
+  auth.isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
+)
 
 const avatarLetter = computed(() =>
   (auth.username || 'U').charAt(0).toUpperCase()

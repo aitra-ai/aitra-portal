@@ -49,6 +49,24 @@ const router = createRouter({
           name: 'openclaw',
           component: () => import('../views/OpenClawView.vue'),
         },
+        {
+          path: 'deployments',
+          name: 'deployments',
+          component: () => import('../views/DeploymentsView.vue'),
+        },
+      ],
+    },
+    {
+      path: '/admin',
+      component: () => import('../views/LayoutView.vue'),
+      redirect: '/admin/services',
+      children: [
+        {
+          path: 'services',
+          name: 'adminServices',
+          component: () => import('../views/AdminServicesView.vue'),
+          meta: { requireAdmin: true },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -58,6 +76,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isLoggedIn) return '/login'
+  if (to.meta.requireAdmin && !auth.isAdmin) return '/app/models'
   if ((to.path === '/login' || to.path === '/register') && auth.isLoggedIn) return '/app/models'
 })
 
