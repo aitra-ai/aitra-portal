@@ -47,7 +47,7 @@ export const chatCompletionsStream = async (
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   try {
-    const res = await fetch('/api/v1/chat/completions', {
+    const res = await fetch('/v1/chat/completions', {
       method: 'POST',
       headers,
       body: JSON.stringify({ ...req, stream: true }),

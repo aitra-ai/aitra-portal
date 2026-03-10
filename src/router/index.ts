@@ -73,6 +73,12 @@ const router = createRouter({
           component: () => import('../views/AdminServicesView.vue'),
           meta: { requireAdmin: true },
         },
+        {
+          path: 'external-models',
+          name: 'adminExternalModels',
+          component: () => import('../views/AdminExternalModelsView.vue'),
+          meta: { requireAdmin: true },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

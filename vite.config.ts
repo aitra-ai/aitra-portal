@@ -31,6 +31,16 @@ export default defineConfig({
         target: 'http://localhost:8088',
         changeOrigin: true,
       },
+      // aigateway (OpenAI-compatible API)
+      '/v1': {
+        target: 'http://localhost:8094',
+        changeOrigin: true,
+      },
+      // admin routes go to user server
+      '/api/v1/admin': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
       // casdoor
       '/casdoor': {
         target: 'http://localhost:8000',

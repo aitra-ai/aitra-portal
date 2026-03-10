@@ -88,6 +88,7 @@ const baseNavItems = [
 
 const adminNavItems = [
   { to: '/admin/services', label: 'nav.adminServices', icon: 'Tools' },
+  { to: '/admin/external-models', label: 'nav.externalModels', icon: 'Connection' },
 ]
 
 const navItems = computed(() =>
