@@ -5,18 +5,64 @@ const CASDOOR_CLIENT_ID = '7a97bc5168cb75ffc514'
 const CASDOOR_URL = import.meta.env.VITE_CASDOOR_URL || 'http://10.100.18.37:8000'
 const API_CALLBACK_URL = `${import.meta.env.VITE_API_BASE || 'http://10.100.18.37:8080'}/api/v1/callback/casdoor`
 
-// Build Casdoor OAuth2 authorization URL for social login
-// state=casdoor → csghub-server will redirect to signinSuccessRedirectURL?jwt=xxx
-export function getOAuthUrl(provider: 'github' | 'google') {
-  const params = new URLSearchParams({
-    client_id: CASDOOR_CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: API_CALLBACK_URL,
-    scope: 'read',
-    state: 'casdoor',
+/**
+ * Open Casdoor OAuth in a popup window.
+ * Returns a Promise that resolves with the JWT string when auth completes,
+ * or rejects on error / popup closed.
+ */
+export function oauthPopup(provider: 'github' | 'google'): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const params = new URLSearchParams({
+      client_id: CASDOOR_CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: API_CALLBACK_URL,
+      scope: 'read',
+      state: 'casdoor',
+    })
+    const url = `${CASDOOR_URL}/login/${provider}?${params}`
+
+    const width = 520
+    const height = 620
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    const popup = window.open(
+      url,
+      'oauth_popup',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    )
+
+    if (!popup) {
+      reject(new Error('Popup blocked. Please allow popups for this site.'))
+      return
+    }
+
+    // Listen for postMessage from CallbackView
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== 'oauth_callback') return
+      cleanup()
+      if (event.data.jwt) {
+        resolve(event.data.jwt)
+      } else {
+        reject(new Error(event.data.error || 'Authentication failed'))
+      }
+    }
+
+    // Poll for popup closed without completing auth
+    const pollTimer = setInterval(() => {
+      if (popup.closed) {
+        cleanup()
+        reject(new Error('popup_closed'))
+      }
+    }, 500)
+
+    function cleanup() {
+      window.removeEventListener('message', onMessage)
+      clearInterval(pollTimer)
+    }
+
+    window.addEventListener('message', onMessage)
   })
-  // Casdoor's provider-specific login shortcut
-  return `${CASDOOR_URL}/login/${provider}?${params}`
 }
 
 async function casdoorPost(path: string, body: object) {

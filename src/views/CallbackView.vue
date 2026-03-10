@@ -47,7 +47,14 @@ onMounted(() => {
     return
   }
 
-  // Store JWT and decode user info
+  // If opened as a popup, send JWT back to parent window and close
+  if (window.opener) {
+    window.opener.postMessage({ type: 'oauth_callback', jwt }, window.location.origin)
+    window.close()
+    return
+  }
+
+  // Fallback: normal page flow (e.g. direct URL access)
   try {
     const payload = JSON.parse(atob(jwt.split('.')[1]!))
     const username = payload.sub || payload.username || payload.name || 'user'
