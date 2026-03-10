@@ -204,7 +204,16 @@ const rules = {
   ],
   password: [
     { required: true, message: ' ', trigger: 'blur' },
-    { min: 6, message: t('register.passwordMin'), trigger: 'blur' },
+    {
+      validator: (_: any, value: string, cb: Function) => {
+        if (value.length < 6) return cb(new Error(t('register.passwordMin')))
+        if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/[0-9]/.test(value)) {
+          return cb(new Error(t('register.passwordMin')))
+        }
+        cb()
+      },
+      trigger: 'blur',
+    },
   ],
   confirmPassword: [
     { required: true, message: ' ', trigger: 'blur' },

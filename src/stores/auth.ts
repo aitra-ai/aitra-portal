@@ -21,21 +21,21 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(params: LoginParams) {
     const res = await apiLogin(params)
-    const jwt = res.data?.data?.token || (res.data as any)?.token
+    const data = res.data?.data || (res.data as any)
+    const jwt = data?.token
     if (!jwt) throw new Error('No token in response')
     token.value = jwt
-    // Decode username from JWT payload
-    try {
-      const payload = JSON.parse(atob(jwt.split('.')[1]))
-      const info: UserInfo = { username: payload.sub || payload.username || params.login_name }
-      userInfo.value = info
-      localStorage.setItem('jwt_token', jwt)
-      localStorage.setItem('user_info', JSON.stringify(info))
-    } catch {
-      userInfo.value = { username: params.login_name }
-      localStorage.setItem('jwt_token', jwt)
-      localStorage.setItem('user_info', JSON.stringify({ username: params.login_name }))
-    }
+    // Use username from response, fallback to JWT payload
+    const resolvedUsername = data?.username || (() => {
+      try {
+        const payload = JSON.parse(atob(jwt.split('.')[1]))
+        return payload.sub || payload.username || params.username
+      } catch { return params.username }
+    })()
+    const info: UserInfo = { username: resolvedUsername }
+    userInfo.value = info
+    localStorage.setItem('jwt_token', jwt)
+    localStorage.setItem('user_info', JSON.stringify(info))
   }
 
   function logout() {

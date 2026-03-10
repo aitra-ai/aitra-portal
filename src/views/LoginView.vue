@@ -62,9 +62,9 @@
 
       <!-- Email form -->
       <el-form :model="form" :rules="rules" ref="formRef" @submit.prevent="handleLogin">
-        <el-form-item prop="login_name" class="mb-4">
+        <el-form-item prop="username" class="mb-4">
           <div class="text-sm text-gray-700 font-medium mb-1.5">{{ t('login.usernameOrEmail') }}</div>
-          <el-input v-model="form.login_name" :placeholder="t('login.usernameOrEmailPlaceholder')" size="large" />
+          <el-input v-model="form.username" :placeholder="t('login.usernameOrEmailPlaceholder')" size="large" />
         </el-form-item>
 
         <el-form-item prop="password" class="mb-2">
@@ -117,9 +117,9 @@ const formRef = ref()
 const loading = ref(false)
 const oauthLoading = ref<string | null>(null)
 const errorMsg = ref('')
-const form = reactive({ login_name: '', password: '' })
+const form = reactive({ username: '', password: '' })
 const rules = {
-  login_name: [{ required: true, message: ' ', trigger: 'blur' }],
+  username: [{ required: true, message: ' ', trigger: 'blur' }],
   password: [{ required: true, message: ' ', trigger: 'blur' }],
 }
 
