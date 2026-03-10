@@ -92,6 +92,7 @@ export const signupWithEmail = (params: {
     application: CASDOOR_APP,
     organization: CASDOOR_ORG,
     username: params.username,
+    name: params.username,  // display name, required by Casdoor
     password: params.password,
     email: params.email,
   })
