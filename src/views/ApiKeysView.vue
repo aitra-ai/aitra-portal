@@ -101,6 +101,90 @@
       </el-tabs>
     </div>
 
+    <!-- API Tester -->
+    <div class="mt-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div>
+          <h3 class="font-semibold text-gray-800">{{ t('apikeys.testerTitle') }}</h3>
+          <p class="text-xs text-gray-400 mt-0.5">{{ t('apikeys.testerSubtitle') }}</p>
+        </div>
+        <el-button text size="small" @click="testerOpen = !testerOpen">
+          {{ testerOpen ? t('apikeys.testerHide') : t('apikeys.testerShow') }}
+        </el-button>
+      </div>
+
+      <div v-if="testerOpen" class="p-5 space-y-4">
+        <!-- Config row -->
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-40">
+            <p class="text-xs text-gray-500 mb-1">{{ t('apikeys.testerSelectKey') }}</p>
+            <el-select v-model="tester.tokenValue" class="w-full" :placeholder="t('apikeys.testerSelectKeyPlaceholder')">
+              <el-option
+                v-for="tk in tokens"
+                :key="tk.token"
+                :label="tk.name || tk.token_name"
+                :value="tk.token"
+              />
+            </el-select>
+          </div>
+          <div class="flex-1 min-w-40">
+            <p class="text-xs text-gray-500 mb-1">{{ t('apikeys.testerModel') }}</p>
+            <el-input v-model="tester.model" placeholder="e.g. Qwen2.5-72B" />
+          </div>
+        </div>
+
+        <!-- Chat messages -->
+        <div
+          ref="testerMessagesEl"
+          class="bg-gray-50 rounded-xl p-4 space-y-3 overflow-y-auto"
+          style="min-height:160px; max-height:320px"
+        >
+          <div v-if="testerMessages.length === 0" class="flex items-center justify-center h-24 text-gray-400 text-sm">
+            {{ t('apikeys.testerEmpty') }}
+          </div>
+          <template v-for="(msg, i) in testerMessages" :key="i">
+            <div v-if="msg.role === 'user'" class="flex justify-end">
+              <div class="bg-blue-500 text-white text-sm rounded-2xl rounded-tr-sm px-4 py-2 max-w-[75%] whitespace-pre-wrap">
+                {{ msg.content }}
+              </div>
+            </div>
+            <div v-else class="flex justify-start gap-2">
+              <div class="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">AI</div>
+              <div class="bg-white border border-gray-200 text-sm rounded-2xl rounded-tl-sm px-4 py-2 max-w-[75%] whitespace-pre-wrap" :class="msg._error ? 'border-red-200 text-red-500' : ''">
+                <span v-if="msg.content">{{ msg.content }}</span>
+                <span v-else class="text-gray-300 italic">{{ t('models.thinking') }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Input -->
+        <div class="flex gap-2">
+          <el-input
+            v-model="tester.input"
+            :placeholder="t('apikeys.testerInputPlaceholder')"
+            :disabled="testerLoading"
+            @keydown.enter.exact.prevent="sendTesterMessage"
+            @keydown.shift.enter="() => {}"
+            class="flex-1"
+          />
+          <el-button
+            type="primary"
+            :loading="testerLoading"
+            :disabled="!tester.input.trim() || !tester.tokenValue || !tester.model"
+            @click="sendTesterMessage"
+          >
+            {{ t('models.send') }}
+          </el-button>
+          <el-button text @click="testerMessages = []" :icon="Delete" />
+        </div>
+
+        <p v-if="!tester.tokenValue || !tester.model" class="text-xs text-amber-500">
+          {{ t('apikeys.testerHint') }}
+        </p>
+      </div>
+    </div>
+
     <!-- Create dialog -->
     <el-dialog v-model="showCreateDialog" :title="t('apikeys.create')" width="400px">
       <el-form :model="createForm" label-position="top">
@@ -123,9 +207,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { listTokens, createToken, deleteToken } from '../api/tokens'
 import type { Token } from '../api/tokens'
@@ -229,5 +313,72 @@ function copyText(text: string) {
   navigator.clipboard.writeText(text).then(() => {
     ElMessage.success(t('apikeys.copySuccess'))
   })
+}
+
+// ── API Tester ──────────────────────────────────────────────────────
+const testerOpen = ref(false)
+const testerLoading = ref(false)
+const testerMessagesEl = ref<HTMLElement | null>(null)
+const testerMessages = ref<Array<{ role: string; content: string; _error?: boolean }>>([])
+const tester = reactive({ tokenValue: '', model: '', input: '' })
+
+async function sendTesterMessage() {
+  const text = tester.input.trim()
+  if (!text || !tester.tokenValue || !tester.model) return
+  tester.input = ''
+
+  testerMessages.value.push({ role: 'user', content: text })
+  const aiMsg = { role: 'assistant', content: '', _error: false }
+  testerMessages.value.push(aiMsg)
+  testerLoading.value = true
+  await scrollTester()
+
+  try {
+    const res = await fetch('/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tester.tokenValue}`,
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        model: tester.model,
+        messages: testerMessages.value.filter(m => !m._error).slice(0, -1).map(m => ({ role: m.role, content: m.content })),
+        stream: true,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      aiMsg.content = `Error ${res.status}: ${err.message || err.msg || res.statusText}`
+      aiMsg._error = true
+      return
+    }
+
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        const d = line.replace(/^data: /, '').trim()
+        if (!d || d === '[DONE]') continue
+        try {
+          const chunk = JSON.parse(d)?.choices?.[0]?.delta?.content ?? ''
+          if (chunk) { aiMsg.content += chunk; await scrollTester() }
+        } catch { /* skip */ }
+      }
+    }
+  } catch (e: any) {
+    aiMsg.content = e.message
+    aiMsg._error = true
+  } finally {
+    testerLoading.value = false
+  }
+}
+
+async function scrollTester() {
+  await nextTick()
+  if (testerMessagesEl.value) testerMessagesEl.value.scrollTop = testerMessagesEl.value.scrollHeight
 }
 </script>
