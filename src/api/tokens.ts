@@ -11,8 +11,14 @@ export interface Token {
 export const listTokens = (username: string, app = 'git') =>
   api.get<{ data: Token[] }>(`/user/${username}/tokens`, { params: { app } })
 
-export const createToken = (app: string, tokenName: string) =>
-  api.put<{ data: Token }>(`/token/${app}/${tokenName}`)
+export const createToken = (app: string, tokenName: string, expiredAt?: string) => {
+  // expired_at: one year from now by default
+  const expired = expiredAt || new Date(Date.now() + 365 * 86400000).toISOString()
+  return api.post<{ data: Token }>(`/token/${app}/${tokenName}`, {
+    name: tokenName,
+    expired_at: expired,
+  })
+}
 
 export const deleteToken = (app: string, tokenName: string) =>
   api.delete(`/token/${app}/${tokenName}`)

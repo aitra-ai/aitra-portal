@@ -172,9 +172,11 @@ async function fetchTokens() {
   loading.value = true
   try {
     const res = await listTokens(auth.username, 'git')
+    // API returns null when no tokens exist
     tokens.value = res.data?.data ?? []
   } catch {
-    ElMessage.error(t('common.error'))
+    // non-critical — just show empty
+    tokens.value = []
   } finally {
     loading.value = false
   }
@@ -185,13 +187,19 @@ async function handleCreate() {
   creating.value = true
   try {
     const res = await createToken('git', createForm.name.trim())
-    const token = res.data?.data?.token || (res.data as any)?.token
-    newToken.value = token || null
+    const data = res.data?.data ?? (res.data as any)
+    const token = data?.token
+    if (token) {
+      newToken.value = token
+    } else {
+      ElMessage.warning('Key created but token not returned — check existing keys')
+    }
     createForm.name = ''
     showCreateDialog.value = false
     await fetchTokens()
-  } catch {
-    ElMessage.error(t('common.error'))
+  } catch (e: any) {
+    const msg = e?.response?.data?.msg || t('common.error')
+    ElMessage.error(msg)
   } finally {
     creating.value = false
   }
