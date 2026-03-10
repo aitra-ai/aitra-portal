@@ -163,7 +163,12 @@ export default {
     testerModel: '模型 ID',
     testerEmpty: '输入消息后点发送开始测试',
     testerInputPlaceholder: '输入测试消息，Enter 发送',
-    testerHint: '请先选择 API Key 并填写模型 ID',
+    testerHint: '请先完善配置后再发送',
+    testerModePlatform: '平台 API',
+    testerModeExternalOff: '外部 API（未配置）',
+    testerModeCustom: '自定义',
+    testerModePlatformTip: '使用平台部署的模型',
+    testerApiKey: 'API Key',
   },
   openclaw: {
     title: 'OpenClaw 管理',

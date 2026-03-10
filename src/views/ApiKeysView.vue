@@ -115,21 +115,42 @@
 
       <div v-if="testerOpen" class="p-5 space-y-4">
         <!-- Config row -->
+        <!-- API source toggle -->
+        <div class="flex items-center gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
+          <el-radio-group v-model="tester.mode" size="small" @change="onModeChange">
+            <el-radio-button value="platform">{{ t('apikeys.testerModePlatform') }}</el-radio-button>
+            <el-radio-button value="external" :disabled="!externalApiConfig.enabled">
+              {{ externalApiConfig.enabled ? externalApiConfig.name || 'External' : t('apikeys.testerModeExternalOff') }}
+            </el-radio-button>
+            <el-radio-button value="custom">{{ t('apikeys.testerModeCustom') }}</el-radio-button>
+          </el-radio-group>
+          <span v-if="tester.mode === 'platform'" class="text-xs text-gray-400 ml-2">
+            {{ t('apikeys.testerModePlatformTip') }}
+          </span>
+        </div>
+
         <div class="flex flex-wrap gap-3 items-end">
-          <div class="flex-1 min-w-40">
-            <p class="text-xs text-gray-500 mb-1">{{ t('apikeys.testerSelectKey') }}</p>
-            <el-select v-model="tester.tokenValue" class="w-full" :placeholder="t('apikeys.testerSelectKeyPlaceholder')">
-              <el-option
-                v-for="tk in tokens"
-                :key="tk.token"
-                :label="tk.name || tk.token_name"
-                :value="tk.token"
-              />
+          <!-- Key selector (platform mode) / api key input (other modes) -->
+          <div class="flex-1 min-w-44">
+            <p class="text-xs text-gray-500 mb-1">
+              {{ tester.mode === 'platform' ? t('apikeys.testerSelectKey') : t('apikeys.testerApiKey') }}
+            </p>
+            <el-select v-if="tester.mode === 'platform'" v-model="tester.tokenValue" class="w-full" :placeholder="t('apikeys.testerSelectKeyPlaceholder')">
+              <el-option v-for="tk in tokens" :key="tk.token" :label="tk.name || tk.token_name" :value="tk.token" />
             </el-select>
+            <el-input v-else v-model="tester.apiKey" type="password" show-password :placeholder="t('apikeys.apiKeyPlaceholder')" />
           </div>
+
+          <!-- Base URL (external/custom) -->
+          <div v-if="tester.mode !== 'platform'" class="flex-1 min-w-52">
+            <p class="text-xs text-gray-500 mb-1">Base URL</p>
+            <el-input v-model="tester.baseUrl" placeholder="https://api.openai.com/v1" :readonly="tester.mode === 'external'" />
+          </div>
+
+          <!-- Model -->
           <div class="flex-1 min-w-40">
             <p class="text-xs text-gray-500 mb-1">{{ t('apikeys.testerModel') }}</p>
-            <el-input v-model="tester.model" placeholder="e.g. Qwen2.5-72B" />
+            <el-input v-model="tester.model" :placeholder="tester.mode === 'platform' ? 'Qwen2.5-72B' : 'gpt-4o'" />
           </div>
         </div>
 
@@ -179,9 +200,7 @@
           <el-button text @click="testerMessages = []" :icon="Delete" />
         </div>
 
-        <p v-if="!tester.tokenValue || !tester.model" class="text-xs text-amber-500">
-          {{ t('apikeys.testerHint') }}
-        </p>
+        <p v-if="testerHintMsg" class="text-xs text-amber-500">{{ testerHintMsg }}</p>
       </div>
     </div>
 
@@ -316,55 +335,117 @@ function copyText(text: string) {
 }
 
 // ── API Tester ──────────────────────────────────────────────────────
+const EXTERNAL_KEY = 'external_api_config'
+const externalApiConfig = reactive(
+  JSON.parse(localStorage.getItem(EXTERNAL_KEY) || '{"enabled":false,"name":"","baseUrl":"","apiKey":"","manualModels":""}')
+)
+
 const testerOpen = ref(false)
 const testerLoading = ref(false)
 const testerMessagesEl = ref<HTMLElement | null>(null)
 const testerMessages = ref<Array<{ role: string; content: string; _error?: boolean }>>([])
-const tester = reactive({ tokenValue: '', model: '', input: '' })
+const tester = reactive({
+  mode: 'platform' as 'platform' | 'external' | 'custom',
+  tokenValue: '',
+  apiKey: externalApiConfig.apiKey || '',
+  baseUrl: externalApiConfig.baseUrl || '',
+  model: '',
+  input: '',
+})
+
+const testerHintMsg = computed(() => {
+  if (tester.mode === 'platform' && (!tester.tokenValue || !tester.model))
+    return t('apikeys.testerHint')
+  if (tester.mode !== 'platform' && (!tester.apiKey || !tester.model))
+    return t('apikeys.testerHint')
+  return ''
+})
+
+function onModeChange(mode: string) {
+  if (mode === 'external' && externalApiConfig.enabled) {
+    tester.apiKey = externalApiConfig.apiKey
+    tester.baseUrl = externalApiConfig.baseUrl
+    // Pre-fill first manual model if any
+    const first = externalApiConfig.manualModels?.split(',')[0]?.trim()
+    if (first && !tester.model) tester.model = first
+  } else if (mode === 'platform') {
+    tester.baseUrl = ''
+  }
+}
+
+function isAnthropicUrl(url: string) { return url.includes('anthropic.com') }
+
+function testerHeaders(baseUrl: string, apiKey: string): Record<string, string> {
+  if (isAnthropicUrl(baseUrl)) {
+    return {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    }
+  }
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }
+}
 
 async function sendTesterMessage() {
   const text = tester.input.trim()
-  if (!text || !tester.tokenValue || !tester.model) return
-  tester.input = ''
+  if (!text || !tester.model) return
+  if (tester.mode === 'platform' && !tester.tokenValue) return
+  if (tester.mode !== 'platform' && !tester.apiKey) return
 
+  tester.input = ''
   testerMessages.value.push({ role: 'user', content: text })
-  const aiMsg = { role: 'assistant', content: '', _error: false }
+  const aiMsg = reactive({ role: 'assistant', content: '', _error: false })
   testerMessages.value.push(aiMsg)
   testerLoading.value = true
   await scrollTester()
 
   try {
-    const res = await fetch('/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tester.tokenValue}`,
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify({
-        model: tester.model,
-        messages: testerMessages.value.filter(m => !m._error).slice(0, -1).map(m => ({ role: m.role, content: m.content })),
-        stream: true,
-      }),
-    })
+    let url: string
+    let headers: Record<string, string>
+    let body: object
 
+    const history = testerMessages.value.filter(m => !m._error).slice(0, -1)
+      .map(m => ({ role: m.role, content: m.content }))
+
+    if (tester.mode === 'platform') {
+      // Platform: use /api/v1/v1/chat/completions (OpenAI-compat aigateway)
+      url = '/api/v1/v1/chat/completions'
+      headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tester.tokenValue}` }
+      body = { model: tester.model, messages: history, stream: true }
+    } else {
+      // External or Custom
+      const base = tester.baseUrl.replace(/\/$/, '')
+      const isAnthropic = isAnthropicUrl(base)
+      url = isAnthropic ? `${base}/messages` : `${base}/chat/completions`
+      headers = testerHeaders(base, tester.apiKey)
+      body = isAnthropic
+        ? { model: tester.model, messages: history.filter(m => m.role !== 'system'), stream: true, max_tokens: 2048 }
+        : { model: tester.model, messages: history, stream: true }
+    }
+
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      aiMsg.content = `Error ${res.status}: ${err.message || err.msg || res.statusText}`
+      aiMsg.content = `Error ${res.status}: ${err.error?.message || err.message || err.msg || res.statusText}`
       aiMsg._error = true
       return
     }
 
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
+    const isAnthropic = tester.mode !== 'platform' && isAnthropicUrl(tester.baseUrl)
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       for (const line of decoder.decode(value, { stream: true }).split('\n')) {
-        const d = line.replace(/^data: /, '').trim()
-        if (!d || d === '[DONE]') continue
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data: ') || trimmed === 'data: [DONE]') continue
         try {
-          const chunk = JSON.parse(d)?.choices?.[0]?.delta?.content ?? ''
+          const json = JSON.parse(trimmed.slice(6))
+          const chunk = isAnthropic
+            ? (json.delta?.text ?? '')
+            : (json.choices?.[0]?.delta?.content ?? '')
           if (chunk) { aiMsg.content += chunk; await scrollTester() }
         } catch { /* skip */ }
       }

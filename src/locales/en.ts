@@ -162,7 +162,12 @@ export default {
     testerModel: 'Model ID',
     testerEmpty: 'Type a message and hit Send to start',
     testerInputPlaceholder: 'Type a test message, Enter to send',
-    testerHint: 'Please select an API key and enter a model ID first',
+    testerHint: 'Please complete the config before sending',
+    testerModePlatform: 'Platform API',
+    testerModeExternalOff: 'External API (not set)',
+    testerModeCustom: 'Custom',
+    testerModePlatformTip: 'Use models deployed on the platform',
+    testerApiKey: 'API Key',
   },
   openclaw: {
     title: 'OpenClaw Management',
