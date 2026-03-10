@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin } from '../api/auth'
+import { login as apiLogin, getUserInfo } from '../api/auth'
 import type { LoginParams } from '../api/auth'
 
 interface UserInfo {
@@ -8,6 +8,7 @@ interface UserInfo {
   nickname?: string
   avatar?: string
   email?: string
+  roles?: string[]
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -18,7 +19,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!token.value)
   const username = computed(() => userInfo.value?.username ?? '')
-  const isAdmin = computed(() => !!(userInfo.value as any)?.role_mask && ((userInfo.value as any).role_mask & 1) !== 0)
+  const isAdmin = computed(() => {
+    const roles = userInfo.value?.roles ?? []
+    return roles.includes('admin') || roles.includes('super_user')
+  })
 
   async function login(params: LoginParams) {
     const res = await apiLogin(params)
@@ -37,6 +41,16 @@ export const useAuthStore = defineStore('auth', () => {
     userInfo.value = info
     localStorage.setItem('jwt_token', jwt)
     localStorage.setItem('user_info', JSON.stringify(info))
+    // Fetch full user profile to get roles
+    try {
+      const profileRes = await getUserInfo(resolvedUsername)
+      const profile = (profileRes.data as any)?.data ?? (profileRes.data as any)
+      if (profile?.roles) {
+        info.roles = profile.roles
+        userInfo.value = { ...info }
+        localStorage.setItem('user_info', JSON.stringify(info))
+      }
+    } catch { /* non-critical */ }
   }
 
   function logout() {
