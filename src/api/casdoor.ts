@@ -87,7 +87,6 @@ export const signupWithEmail = (params: {
   username: string
   email: string
   password: string
-  emailCode: string
 }) =>
   casdoorPost('/api/signup', {
     application: CASDOOR_APP,
@@ -95,5 +94,4 @@ export const signupWithEmail = (params: {
     username: params.username,
     password: params.password,
     email: params.email,
-    emailCode: params.emailCode,
   })

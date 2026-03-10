@@ -78,35 +78,10 @@
           <template #label>
             <span class="text-sm font-medium text-gray-700">{{ t('register.email') }}</span>
           </template>
-          <div class="flex gap-2">
-            <el-input
-              v-model="form.email"
-              :placeholder="t('register.emailPlaceholder')"
-              size="large"
-              class="flex-1"
-            />
-            <el-button
-              size="large"
-              :loading="sendingCode"
-              :disabled="!!codeCooldown || !form.email"
-              @click="handleSendCode"
-              class="shrink-0 !px-3"
-            >
-              {{ codeCooldown ? `${codeCooldown}s` : t('register.sendCode') }}
-            </el-button>
-          </div>
-        </el-form-item>
-
-        <!-- Email code -->
-        <el-form-item prop="emailCode">
-          <template #label>
-            <span class="text-sm font-medium text-gray-700">{{ t('register.emailCode') }}</span>
-          </template>
           <el-input
-            v-model="form.emailCode"
-            :placeholder="t('register.emailCodePlaceholder')"
+            v-model="form.email"
+            :placeholder="t('register.emailPlaceholder')"
             size="large"
-            maxlength="6"
           />
         </el-form-item>
 
@@ -179,7 +154,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { sendEmailCode, signupWithEmail, oauthPopup } from '../api/casdoor'
+import { signupWithEmail, oauthPopup } from '../api/casdoor'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -207,15 +182,12 @@ async function oauthLogin(provider: 'github' | 'google') {
 }
 
 const formRef = ref()
-const sendingCode = ref(false)
 const registering = ref(false)
-const codeCooldown = ref(0)
 const success = ref(false)
 const errorMsg = ref('')
 
 const form = reactive({
   email: '',
-  emailCode: '',
   username: '',
   password: '',
   confirmPassword: '',
@@ -226,7 +198,6 @@ const rules = {
     { required: true, message: ' ', trigger: 'blur' },
     { type: 'email', message: t('register.emailInvalid'), trigger: 'blur' },
   ],
-  emailCode: [{ required: true, message: ' ', trigger: 'blur' }],
   username: [
     { required: true, message: ' ', trigger: 'blur' },
     { min: 3, message: t('register.usernameMin'), trigger: 'blur' },
@@ -247,32 +218,6 @@ const rules = {
   ],
 }
 
-function startCooldown() {
-  codeCooldown.value = 60
-  const timer = setInterval(() => {
-    codeCooldown.value--
-    if (codeCooldown.value <= 0) clearInterval(timer)
-  }, 1000)
-}
-
-async function handleSendCode() {
-  if (!form.email) return
-  sendingCode.value = true
-  try {
-    const res = await sendEmailCode(form.email)
-    if (res.status === 'ok' || res.status === 'affected') {
-      ElMessage.success(t('register.codeSent'))
-      startCooldown()
-    } else {
-      ElMessage.error(res.msg || t('common.error'))
-    }
-  } catch {
-    ElMessage.error(t('common.error'))
-  } finally {
-    sendingCode.value = false
-  }
-}
-
 async function handleRegister() {
   await formRef.value?.validate(async (valid: boolean) => {
     if (!valid) return
@@ -283,7 +228,6 @@ async function handleRegister() {
         username: form.username,
         email: form.email,
         password: form.password,
-        emailCode: form.emailCode,
       })
       if (res.status === 'ok' || res.status === 'affected') {
         success.value = true
