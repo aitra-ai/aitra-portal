@@ -218,7 +218,7 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Delete, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
@@ -227,6 +227,7 @@ import type { Model, ChatMessage } from '../api/models'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 // ── External API config ──────────────────────────────────────────────
@@ -367,7 +368,20 @@ const systemPrompt = ref('')
 const temperature = ref(0.7)
 const maxTokens = ref(2048)
 
-onMounted(fetchModels)
+onMounted(async () => {
+  await fetchModels()
+  // Pre-select model from query param (coming from Model Hub)
+  const modelPath = route.query.model as string
+  if (modelPath && models.value.length > 0) {
+    const found = models.value.find(m => m.id === modelPath || m.id.includes(modelPath.split('/')[1] ?? modelPath))
+    if (found) openPlayground(found)
+    else {
+      // Model from hub may not be in playground list — add it as a virtual entry
+      const parts = modelPath.split('/')
+      openPlayground({ id: parts[1] || modelPath, object: 'model', created: 0, owned_by: parts[0] || 'platform' })
+    }
+  }
+})
 
 async function fetchModels() {
   loadingModels.value = true

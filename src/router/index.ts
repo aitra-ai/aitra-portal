@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/models',
+      name: 'modelHub',
+      component: () => import('../views/ModelHubView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/app',
       component: () => import('../views/LayoutView.vue'),
       redirect: '/app/models',
