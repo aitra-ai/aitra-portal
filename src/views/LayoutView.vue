@@ -24,17 +24,27 @@
         </router-link>
       </nav>
 
-      <!-- User info -->
+      <!-- User info / Guest -->
       <div class="px-4 py-4 border-t border-slate-700">
-        <div class="flex items-center gap-2 mb-3">
-          <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-semibold">
-            {{ avatarLetter }}
+        <template v-if="auth.isLoggedIn">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-semibold">
+              {{ avatarLetter }}
+            </div>
+            <span class="text-sm text-slate-300 truncate">{{ auth.username }}</span>
           </div>
-          <span class="text-sm text-slate-300 truncate">{{ auth.username }}</span>
-        </div>
-        <el-button size="small" text class="!text-slate-400 !px-0 text-xs" @click="handleLogout">
-          <el-icon class="mr-1"><SwitchButton /></el-icon>{{ t('common.logout') }}
-        </el-button>
+          <el-button size="small" text class="!text-slate-400 !px-0 text-xs" @click="handleLogout">
+            <el-icon class="mr-1"><SwitchButton /></el-icon>{{ t('common.logout') }}
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button size="small" class="w-full mb-2" type="primary" @click="router.push('/register')">
+            {{ t('nav.register') }}
+          </el-button>
+          <el-button size="small" class="w-full !ml-0" @click="router.push('/login')">
+            {{ t('nav.login') }}
+          </el-button>
+        </template>
       </div>
     </aside>
 

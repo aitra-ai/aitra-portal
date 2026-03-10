@@ -49,6 +49,8 @@ export default {
     models: '模型广场',
     apikeys: 'API Keys',
     openclaw: 'OpenClaw',
+    register: '免费注册',
+    login: '登录',
   },
   login: {
     title: '登录',
@@ -107,6 +109,9 @@ export default {
     maxTokens: '最大 Token',
     settings: '参数设置',
     noModels: '暂无可用模型',
+    loginRequired: '需要登录才能{action}，注册免费体验完整功能',
+    loginRequiredTitle: '登录后继续',
+    actionChat: '使用 AI 对话',
   },
   apikeys: {
     title: 'API Key 管理',

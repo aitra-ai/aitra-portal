@@ -130,12 +130,16 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { ArrowLeft, Delete, Setting } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useAuthStore } from '../stores/auth'
 import { listModels, chatCompletionsStream } from '../api/models'
 import type { Model, ChatMessage } from '../api/models'
 
 const { t } = useI18n()
+const router = useRouter()
+const auth = useAuthStore()
 
 const models = ref<Model[]>([])
 const loadingModels = ref(false)
@@ -164,6 +168,26 @@ async function fetchModels() {
   }
 }
 
+async function requireLogin(action: string): Promise<boolean> {
+  if (auth.isLoggedIn) return true
+  try {
+    await ElMessageBox.confirm(
+      t('models.loginRequired', { action }),
+      t('models.loginRequiredTitle'),
+      {
+        confirmButtonText: t('register.submit'),
+        cancelButtonText: t('login.submit'),
+        type: 'info',
+        distinguishCancelAndClose: true,
+      }
+    )
+    router.push('/register')
+  } catch (action) {
+    if (action === 'cancel') router.push('/login')
+  }
+  return false
+}
+
 function openPlayground(model: Model) {
   selectedModel.value = model
   messages.value = []
@@ -176,6 +200,7 @@ function clearChat() {
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || streaming.value || !selectedModel.value) return
+  if (!await requireLogin(t('models.actionChat'))) return
 
   inputText.value = ''
   messages.value.push({ role: 'user', content: text })

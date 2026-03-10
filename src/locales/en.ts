@@ -49,6 +49,8 @@ export default {
     models: 'Model Playground',
     apikeys: 'API Keys',
     openclaw: 'OpenClaw',
+    register: 'Sign Up Free',
+    login: 'Sign In',
   },
   login: {
     title: 'Sign In',
@@ -107,6 +109,9 @@ export default {
     maxTokens: 'Max Tokens',
     settings: 'Settings',
     noModels: 'No models available',
+    loginRequired: 'You need to log in to {action}. Register for free to unlock full access.',
+    loginRequiredTitle: 'Login Required',
+    actionChat: 'use AI chat',
   },
   apikeys: {
     title: 'API Key Management',

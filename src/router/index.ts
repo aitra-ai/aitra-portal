@@ -37,6 +37,7 @@ const router = createRouter({
           path: 'models',
           name: 'models',
           component: () => import('../views/ModelPlayground.vue'),
+          meta: { public: true },
         },
         {
           path: 'apikeys',
