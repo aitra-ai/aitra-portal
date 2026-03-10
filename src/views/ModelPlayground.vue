@@ -187,6 +187,9 @@
 
           <el-form-item :label="t('models.apiKey')">
             <el-input v-model="apiForm.apiKey" type="password" show-password :placeholder="t('models.apiKeyPlaceholder')" />
+            <p v-if="apiForm.name === 'Claude (Anthropic)'" class="text-xs text-gray-400 mt-1">
+              {{ t('models.claudeTip') }}
+            </p>
           </el-form-item>
 
           <el-form-item :label="t('models.manualModels')">
@@ -238,11 +241,32 @@ interface ExternalApiConfig {
 const STORAGE_KEY = 'external_api_config'
 
 const API_PRESETS = [
+  { name: 'Claude (Anthropic)', baseUrl: 'https://api.anthropic.com/v1', models: 'claude-opus-4-5,claude-sonnet-4-6,claude-3-5-sonnet-20241022,claude-3-5-haiku-20241022,claude-3-opus-20240229' },
   { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', models: 'anthropic/claude-3.5-sonnet,anthropic/claude-3-haiku,openai/gpt-4o,openai/gpt-4o-mini,google/gemini-flash-1.5' },
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: 'gpt-4o,gpt-4o-mini,gpt-3.5-turbo' },
   { name: 'Ollama', baseUrl: 'http://localhost:11434/v1', models: 'llama3.2,qwen2.5,mistral' },
   { name: 'LM Studio', baseUrl: 'http://localhost:1234/v1', models: '' },
 ]
+
+function isAnthropic(baseUrl: string) {
+  return baseUrl.includes('anthropic.com')
+}
+
+function buildHeaders(baseUrl: string, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (isAnthropic(baseUrl)) {
+    headers['x-api-key'] = apiKey
+    headers['anthropic-version'] = '2023-06-01'
+    headers['anthropic-dangerous-direct-browser-access'] = 'true'
+  } else {
+    headers['Authorization'] = `Bearer ${apiKey}`
+    headers['HTTP-Referer'] = window.location.origin
+    headers['X-Title'] = 'aitra'
+  }
+  return headers
+}
 
 const externalApi = reactive<ExternalApiConfig>(
   JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"enabled":false,"name":"","baseUrl":"","apiKey":"","manualModels":""}')
@@ -270,11 +294,13 @@ function applyPreset(preset: typeof API_PRESETS[0]) {
 
 async function fetchExternalModels(baseUrl: string, apiKey: string): Promise<Model[]> {
   const res = await fetch(`${baseUrl}/models`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: buildHeaders(baseUrl, apiKey),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
-  const list: Model[] = (data.data || []).map((m: any) => ({
+  // Anthropic returns { data: [{id, display_name, ...}] }, OpenAI returns { data: [{id, ...}] }
+  const rawList = data.data || []
+  const list: Model[] = rawList.map((m: any) => ({
     id: m.id,
     object: m.object || 'model',
     created: m.created || 0,
@@ -423,22 +449,34 @@ async function sendMessage() {
 }
 
 async function streamExternal(assistantMsg: ChatMessage, apiMessages: ChatMessage[]) {
-  try {
-    const res = await fetch(`${externalApi.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${externalApi.apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'aitra',
-      },
-      body: JSON.stringify({
+  const isAnthropicApi = isAnthropic(externalApi.baseUrl)
+  const endpoint = isAnthropicApi
+    ? `${externalApi.baseUrl}/messages`
+    : `${externalApi.baseUrl}/chat/completions`
+
+  // Anthropic uses /messages with different body format
+  const body = isAnthropicApi
+    ? {
+        model: selectedModel.value!.id,
+        messages: apiMessages.filter(m => m.role !== 'system'),
+        system: apiMessages.find(m => m.role === 'system')?.content,
+        stream: true,
+        max_tokens: maxTokens.value,
+        temperature: temperature.value,
+      }
+    : {
         model: selectedModel.value!.id,
         messages: apiMessages,
         stream: true,
         temperature: temperature.value,
         max_tokens: maxTokens.value,
-      }),
+      }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: buildHeaders(externalApi.baseUrl, externalApi.apiKey),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {
@@ -455,13 +493,26 @@ async function streamExternal(assistantMsg: ChatMessage, apiMessages: ChatMessag
       if (done) break
       const chunk = decoder.decode(value, { stream: true })
       for (const line of chunk.split('\n')) {
-        const trimmed = line.replace(/^data: /, '').trim()
-        if (!trimmed || trimmed === '[DONE]') continue
-        try {
-          const json = JSON.parse(trimmed)
-          const text = json.choices?.[0]?.delta?.content ?? ''
-          if (text) { assistantMsg.content += text; await scrollToBottom() }
-        } catch { /* skip */ }
+        const trimmed = line.trim()
+        if (!trimmed || trimmed === 'data: [DONE]') continue
+
+        // Anthropic SSE: "event: content_block_delta" + "data: {...}"
+        if (isAnthropicApi) {
+          if (!trimmed.startsWith('data: ')) continue
+          try {
+            const json = JSON.parse(trimmed.slice(6))
+            // content_block_delta carries the text
+            const text = json.delta?.text ?? json.delta?.partial_json ?? ''
+            if (text) { assistantMsg.content += text; await scrollToBottom() }
+          } catch { /* skip */ }
+        } else {
+          if (!trimmed.startsWith('data: ')) continue
+          try {
+            const json = JSON.parse(trimmed.slice(6))
+            const text = json.choices?.[0]?.delta?.content ?? ''
+            if (text) { assistantMsg.content += text; await scrollToBottom() }
+          } catch { /* skip */ }
+        }
       }
     }
   } catch (e: any) {

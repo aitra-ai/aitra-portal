@@ -132,6 +132,7 @@ export default {
     saveConnect: '保存并连接',
     testSuccess: '连接成功，获取到 {count} 个模型',
     apiConnected: '外部 API 已连接',
+    claudeTip: 'Claude API Key 以 sk-ant- 开头，可在 console.anthropic.com 获取',
   },
   apikeys: {
     title: 'API Key 管理',
