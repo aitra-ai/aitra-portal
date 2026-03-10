@@ -62,10 +62,14 @@ export default {
     noAccount: '还没有账号？',
     register: '立即注册',
     or: '或',
+    github: '使用 GitHub 继续',
+    google: '使用 Google 继续',
   },
   register: {
     title: '创建账号',
-    subtitle: '使用邮箱注册，开始使用 CSG 平台',
+    subtitle: '使用邮箱或第三方账号注册',
+    github: '使用 GitHub 注册',
+    google: '使用 Google 注册',
     email: '邮箱地址',
     emailPlaceholder: '请输入邮箱',
     emailInvalid: '请输入有效的邮箱地址',
@@ -138,6 +142,11 @@ export default {
     status: '状态',
     endpoint: '接入点',
     name: '名称',
+  },
+  callback: {
+    processing: '正在处理登录，请稍候...',
+    failed: '登录失败',
+    backToLogin: '返回登录',
   },
   common: {
     loading: '加载中...',

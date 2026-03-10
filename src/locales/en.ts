@@ -62,10 +62,14 @@ export default {
     noAccount: "Don't have an account?",
     register: 'Sign up',
     or: 'Or continue with',
+    github: 'Continue with GitHub',
+    google: 'Continue with Google',
   },
   register: {
     title: 'Create Account',
-    subtitle: 'Register with your email to get started',
+    subtitle: 'Sign up with email or a third-party account',
+    github: 'Sign up with GitHub',
+    google: 'Sign up with Google',
     email: 'Email Address',
     emailPlaceholder: 'Enter your email',
     emailInvalid: 'Please enter a valid email address',
@@ -138,6 +142,11 @@ export default {
     status: 'Status',
     endpoint: 'Endpoint',
     name: 'Name',
+  },
+  callback: {
+    processing: 'Processing login, please wait...',
+    failed: 'Login Failed',
+    backToLogin: 'Back to Login',
   },
   common: {
     loading: 'Loading...',

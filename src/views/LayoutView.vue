@@ -7,7 +7,7 @@
         <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
           <span class="font-bold text-sm">C</span>
         </div>
-        <span class="font-semibold text-base">CSG Portal</span>
+        <span class="font-semibold text-base">aitra</span>
       </div>
 
       <!-- Nav -->

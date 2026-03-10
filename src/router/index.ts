@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/callback',
+      name: 'callback',
+      component: () => import('../views/CallbackView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/app',
       component: () => import('../views/LayoutView.vue'),
       redirect: '/app/models',

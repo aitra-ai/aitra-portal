@@ -8,7 +8,7 @@
           <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <span class="text-white font-bold text-sm">C</span>
           </div>
-          <span class="font-bold text-lg text-gray-900">CSG Portal</span>
+          <span class="font-bold text-lg text-gray-900">aitra</span>
         </div>
 
         <!-- Nav links -->
@@ -148,7 +148,7 @@
 
     <!-- Footer -->
     <footer class="py-8 border-t border-gray-100 text-center text-sm text-gray-400">
-      © {{ new Date().getFullYear() }} CSG Portal · Powered by OpenCSG
+      © {{ new Date().getFullYear() }} aitra · Powered by OpenCSG
     </footer>
   </div>
 </template>
