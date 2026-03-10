@@ -10,6 +10,8 @@ export default {
     password: '密码',
     submit: '登录',
     error: '用户名或密码错误',
+    noAccount: '还没有账号？',
+    register: '立即注册',
   },
   models: {
     title: '模型广场',

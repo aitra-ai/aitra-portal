@@ -44,6 +44,17 @@
         >
           {{ t('login.submit') }}
         </el-button>
+
+        <div class="text-center mt-4 text-sm text-gray-500">
+          {{ t('login.noAccount') }}
+          <a
+            :href="registerUrl"
+            target="_blank"
+            class="text-blue-500 hover:text-blue-600 font-medium ml-1"
+          >
+            {{ t('login.register') }}
+          </a>
+        </div>
       </el-form>
     </div>
   </div>
@@ -54,6 +65,9 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
+
+const CASDOOR_URL = import.meta.env.VITE_CASDOOR_URL || 'http://10.100.18.37:8000'
+const registerUrl = `${CASDOOR_URL}/signup`
 
 const { t } = useI18n()
 const router = useRouter()

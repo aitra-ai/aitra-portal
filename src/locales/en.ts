@@ -10,6 +10,8 @@ export default {
     password: 'Password',
     submit: 'Sign In',
     error: 'Invalid username or password',
+    noAccount: "Don't have an account?",
+    register: 'Sign up',
   },
   models: {
     title: 'Model Playground',
