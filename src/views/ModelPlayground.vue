@@ -2,16 +2,38 @@
   <div class="flex h-full">
     <!-- Model List (left panel) -->
     <div v-if="!selectedModel" class="flex-1 p-6">
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">{{ t('models.title') }}</h1>
-        <p class="text-gray-500 mt-1">{{ t('models.subtitle') }}</p>
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">{{ t('models.title') }}</h1>
+          <p class="text-gray-500 mt-1 text-sm">{{ t('models.subtitle') }}</p>
+        </div>
+        <el-button :icon="Setting" @click="showApiConfig = true" size="small">
+          {{ externalApi.enabled ? t('models.externalApiActive') : t('models.connectApi') }}
+          <el-badge v-if="externalApi.enabled" is-dot class="ml-1" />
+        </el-button>
       </div>
 
-      <div v-if="loadingModels" class="flex items-center justify-center py-20">
+      <!-- External API banner -->
+      <el-alert
+        v-if="externalApi.enabled"
+        :title="t('models.externalApiBanner', { name: externalApi.name || externalApi.baseUrl })"
+        type="success"
+        :closable="false"
+        class="mb-4"
+        show-icon
+      >
+        <template #default>
+          <el-button text size="small" @click="clearExternalApi">{{ t('models.disconnectApi') }}</el-button>
+        </template>
+      </el-alert>
+
+      <div v-if="loadingModels" class="flex justify-center py-20">
         <el-icon class="animate-spin text-blue-500 text-3xl"><Loading /></el-icon>
       </div>
 
-      <el-empty v-else-if="models.length === 0" :description="t('models.noModels')" />
+      <el-empty v-else-if="models.length === 0" :description="t('models.noModels')" class="py-16">
+        <el-button type="primary" @click="showApiConfig = true">{{ t('models.connectApi') }}</el-button>
+      </el-empty>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <div
@@ -21,34 +43,43 @@
           @click="openPlayground(model)"
         >
           <div class="flex items-start justify-between mb-3">
-            <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-              <el-icon class="text-blue-500 text-xl"><Cpu /></el-icon>
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+              :class="model._external ? 'bg-purple-50' : 'bg-blue-50'">
+              <el-icon :class="model._external ? 'text-purple-500' : 'text-blue-500'" class="text-xl">
+                <component :is="model._external ? 'Connection' : 'Cpu'" />
+              </el-icon>
             </div>
-            <el-tag size="small" type="success">{{ model.owned_by || 'platform' }}</el-tag>
+            <el-tag size="small" :type="model._external ? 'warning' : 'success'">
+              {{ model._external ? (externalApi.name || 'External') : (model.owned_by || 'platform') }}
+            </el-tag>
           </div>
-          <h3 class="font-semibold text-gray-900 mb-1 truncate">{{ model.id }}</h3>
-          <p class="text-xs text-gray-400 mb-4">{{ model.object }}</p>
-          <el-button size="small" type="primary" class="w-full group-hover:opacity-100">
+          <h3 class="font-semibold text-gray-900 mb-1 truncate text-sm">{{ model.id }}</h3>
+          <p class="text-xs text-gray-400 mb-4">{{ model.object || 'language model' }}</p>
+          <el-button size="small" type="primary" class="w-full">
             {{ t('models.tryIt') }}
           </el-button>
         </div>
       </div>
     </div>
 
-    <!-- Chat Playground (right panel) -->
+    <!-- Chat Playground -->
     <div v-else class="flex-1 flex flex-col bg-white">
-      <!-- Chat header -->
+      <!-- Header -->
       <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
         <el-button text @click="selectedModel = null" :icon="ArrowLeft">
           {{ t('models.backToList') }}
         </el-button>
         <div class="h-4 w-px bg-gray-300" />
-        <el-icon class="text-blue-500"><Cpu /></el-icon>
-        <span class="font-semibold text-gray-800">{{ selectedModel.id }}</span>
+        <el-icon :class="selectedModel._external ? 'text-purple-500' : 'text-blue-500'">
+          <component :is="selectedModel._external ? 'Connection' : 'Cpu'" />
+        </el-icon>
+        <span class="font-semibold text-gray-800 text-sm truncate">{{ selectedModel.id }}</span>
+        <el-tag v-if="selectedModel._external" size="small" type="warning" class="shrink-0">
+          {{ externalApi.name || 'External' }}
+        </el-tag>
         <el-button size="small" text class="ml-auto !text-gray-400" @click="clearChat" :icon="Delete">
           {{ t('models.clearChat') }}
         </el-button>
-        <!-- Settings toggle -->
         <el-popover placement="bottom-end" :width="280" trigger="click">
           <template #reference>
             <el-button size="small" text :icon="Setting">{{ t('models.settings') }}</el-button>
@@ -71,20 +102,17 @@
       </div>
 
       <!-- Messages -->
-      <div ref="messagesEl" class="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin">
+      <div ref="messagesEl" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
           <div class="text-center text-gray-400">
             <el-icon class="text-5xl mb-3 text-gray-200"><ChatDotRound /></el-icon>
             <p class="text-sm">{{ t('models.subtitle') }}</p>
           </div>
         </div>
-
         <template v-for="(msg, i) in messages" :key="i">
-          <!-- User message -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
             <div class="chat-bubble-user text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
           </div>
-          <!-- Assistant message -->
           <div v-else class="flex justify-start gap-3">
             <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
               <span class="text-white text-xs font-bold">AI</span>
@@ -97,7 +125,7 @@
         </template>
       </div>
 
-      <!-- Input area -->
+      <!-- Input -->
       <div class="px-6 py-4 border-t border-gray-200 bg-white">
         <div class="flex gap-3 items-end">
           <el-input
@@ -116,7 +144,6 @@
             :loading="streaming"
             :disabled="!inputText.trim()"
             @click="sendMessage"
-            class="h-full"
           >
             <el-icon v-if="!streaming"><Promotion /></el-icon>
             {{ t('models.send') }}
@@ -124,11 +151,69 @@
         </div>
       </div>
     </div>
+
+    <!-- External API Config Dialog -->
+    <el-dialog
+      v-model="showApiConfig"
+      :title="t('models.apiConfigTitle')"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="space-y-4">
+        <!-- Quick presets -->
+        <div>
+          <p class="text-sm text-gray-600 mb-2">{{ t('models.quickConnect') }}</p>
+          <div class="flex flex-wrap gap-2">
+            <el-button
+              v-for="preset in API_PRESETS"
+              :key="preset.name"
+              size="small"
+              :type="apiForm.name === preset.name ? 'primary' : 'default'"
+              @click="applyPreset(preset)"
+            >{{ preset.name }}</el-button>
+          </div>
+        </div>
+
+        <el-divider />
+
+        <el-form :model="apiForm" label-position="top">
+          <el-form-item :label="t('models.apiProvider')">
+            <el-input v-model="apiForm.name" :placeholder="t('models.apiProviderPlaceholder')" />
+          </el-form-item>
+
+          <el-form-item :label="t('models.apiBaseUrl')">
+            <el-input v-model="apiForm.baseUrl" placeholder="https://api.openai.com/v1" />
+          </el-form-item>
+
+          <el-form-item :label="t('models.apiKey')">
+            <el-input v-model="apiForm.apiKey" type="password" show-password :placeholder="t('models.apiKeyPlaceholder')" />
+          </el-form-item>
+
+          <el-form-item :label="t('models.manualModels')">
+            <el-input
+              v-model="apiForm.manualModels"
+              type="textarea"
+              :rows="3"
+              :placeholder="t('models.manualModelsPlaceholder')"
+            />
+            <p class="text-xs text-gray-400 mt-1">{{ t('models.manualModelsTip') }}</p>
+          </el-form-item>
+        </el-form>
+
+        <el-alert v-if="apiTestResult" :title="apiTestResult.msg" :type="apiTestResult.ok ? 'success' : 'error'" :closable="false" show-icon />
+      </div>
+
+      <template #footer>
+        <el-button @click="showApiConfig = false">{{ t('apikeys.cancel') }}</el-button>
+        <el-button :loading="testingApi" @click="testAndConnect">{{ t('models.testAndConnect') }}</el-button>
+        <el-button type="primary" :loading="connectingApi" @click="saveApiConfig">{{ t('models.saveConnect') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, reactive, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Delete, Setting } from '@element-plus/icons-vue'
@@ -141,15 +226,117 @@ const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 
-const models = ref<Model[]>([])
-const loadingModels = ref(false)
-const selectedModel = ref<Model | null>(null)
+// ── External API config ──────────────────────────────────────────────
+interface ExternalApiConfig {
+  enabled: boolean
+  name: string
+  baseUrl: string
+  apiKey: string
+  manualModels: string
+}
 
+const STORAGE_KEY = 'external_api_config'
+
+const API_PRESETS = [
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', models: 'anthropic/claude-3.5-sonnet,anthropic/claude-3-haiku,openai/gpt-4o,openai/gpt-4o-mini,google/gemini-flash-1.5' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: 'gpt-4o,gpt-4o-mini,gpt-3.5-turbo' },
+  { name: 'Ollama', baseUrl: 'http://localhost:11434/v1', models: 'llama3.2,qwen2.5,mistral' },
+  { name: 'LM Studio', baseUrl: 'http://localhost:1234/v1', models: '' },
+]
+
+const externalApi = reactive<ExternalApiConfig>(
+  JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"enabled":false,"name":"","baseUrl":"","apiKey":"","manualModels":""}')
+)
+
+const showApiConfig = ref(false)
+const testingApi = ref(false)
+const connectingApi = ref(false)
+const apiTestResult = ref<{ ok: boolean; msg: string } | null>(null)
+
+const apiForm = reactive({
+  name: externalApi.name,
+  baseUrl: externalApi.baseUrl,
+  apiKey: externalApi.apiKey,
+  manualModels: externalApi.manualModels,
+})
+
+function applyPreset(preset: typeof API_PRESETS[0]) {
+  apiForm.name = preset.name
+  apiForm.baseUrl = preset.baseUrl
+  apiForm.manualModels = preset.models || ''
+  apiForm.apiKey = ''
+  apiTestResult.value = null
+}
+
+async function fetchExternalModels(baseUrl: string, apiKey: string): Promise<Model[]> {
+  const res = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  const list: Model[] = (data.data || []).map((m: any) => ({
+    id: m.id,
+    object: m.object || 'model',
+    created: m.created || 0,
+    owned_by: m.owned_by || apiForm.name,
+    _external: true,
+  }))
+  return list
+}
+
+function parseManualModels(raw: string, providerName: string): Model[] {
+  return raw.split(',').map(s => s.trim()).filter(Boolean).map(id => ({
+    id,
+    object: 'model',
+    created: 0,
+    owned_by: providerName,
+    _external: true,
+  }))
+}
+
+async function testAndConnect() {
+  testingApi.value = true
+  apiTestResult.value = null
+  try {
+    const mods = await fetchExternalModels(apiForm.baseUrl, apiForm.apiKey)
+    apiTestResult.value = { ok: true, msg: t('models.testSuccess', { count: mods.length }) }
+  } catch (e: any) {
+    apiTestResult.value = { ok: false, msg: e.message || t('common.error') }
+  } finally {
+    testingApi.value = false
+  }
+}
+
+async function saveApiConfig() {
+  connectingApi.value = true
+  Object.assign(externalApi, {
+    enabled: true,
+    name: apiForm.name,
+    baseUrl: apiForm.baseUrl,
+    apiKey: apiForm.apiKey,
+    manualModels: apiForm.manualModels,
+  })
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(externalApi))
+  showApiConfig.value = false
+  connectingApi.value = false
+  await fetchModels()
+  ElMessage.success(t('models.apiConnected'))
+}
+
+function clearExternalApi() {
+  Object.assign(externalApi, { enabled: false, name: '', baseUrl: '', apiKey: '', manualModels: '' })
+  localStorage.removeItem(STORAGE_KEY)
+  fetchModels()
+}
+
+// ── Models & Chat ────────────────────────────────────────────────────
+const models = ref<(Model & { _external?: boolean })[]>([])
+const loadingModels = ref(false)
+const selectedModel = ref<(Model & { _external?: boolean }) | null>(null)
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const streaming = ref(false)
 const messagesEl = ref<HTMLElement | null>(null)
-
 const systemPrompt = ref('')
 const temperature = ref(0.7)
 const maxTokens = ref(2048)
@@ -159,10 +346,27 @@ onMounted(fetchModels)
 async function fetchModels() {
   loadingModels.value = true
   try {
-    const res = await listModels()
-    models.value = res.data?.data ?? []
+    if (externalApi.enabled) {
+      let list: Model[] = []
+      // Try fetching model list
+      try {
+        list = await fetchExternalModels(externalApi.baseUrl, externalApi.apiKey)
+      } catch {
+        // Fall back to manual list
+      }
+      // Merge with manual entries
+      if (externalApi.manualModels) {
+        const manual = parseManualModels(externalApi.manualModels, externalApi.name)
+        const existing = new Set(list.map(m => m.id))
+        manual.forEach(m => { if (!existing.has(m.id)) list.push(m) })
+      }
+      models.value = list
+    } else {
+      const res = await listModels()
+      models.value = (res.data?.data ?? []) as (Model & { _external?: boolean })[]
+    }
   } catch {
-    ElMessage.error(t('common.error'))
+    models.value = []
   } finally {
     loadingModels.value = false
   }
@@ -174,75 +378,101 @@ async function requireLogin(action: string): Promise<boolean> {
     await ElMessageBox.confirm(
       t('models.loginRequired', { action }),
       t('models.loginRequiredTitle'),
-      {
-        confirmButtonText: t('register.submit'),
-        cancelButtonText: t('login.submit'),
-        type: 'info',
-        distinguishCancelAndClose: true,
-      }
+      { confirmButtonText: t('register.submit'), cancelButtonText: t('login.submit'), type: 'info', distinguishCancelAndClose: true }
     )
     router.push('/register')
-  } catch (action) {
-    if (action === 'cancel') router.push('/login')
+  } catch (a) {
+    if (a === 'cancel') router.push('/login')
   }
   return false
 }
 
-function openPlayground(model: Model) {
+function openPlayground(model: Model & { _external?: boolean }) {
   selectedModel.value = model
   messages.value = []
 }
 
-function clearChat() {
-  messages.value = []
-}
+function clearChat() { messages.value = [] }
 
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || streaming.value || !selectedModel.value) return
-  if (!await requireLogin(t('models.actionChat'))) return
+  if (!selectedModel.value._external && !await requireLogin(t('models.actionChat'))) return
 
   inputText.value = ''
   messages.value.push({ role: 'user', content: text })
-
   const assistantMsg: ChatMessage = { role: 'assistant', content: '' }
   messages.value.push(assistantMsg)
   streaming.value = true
-
   await scrollToBottom()
 
   const apiMessages: ChatMessage[] = []
-  if (systemPrompt.value) {
-    apiMessages.push({ role: 'system', content: systemPrompt.value })
-  }
-  // all messages except the empty assistant one we just added
+  if (systemPrompt.value) apiMessages.push({ role: 'system', content: systemPrompt.value })
   apiMessages.push(...messages.value.slice(0, -1))
 
-  chatCompletionsStream(
-    {
-      model: selectedModel.value.id,
-      messages: apiMessages,
-      temperature: temperature.value,
-      max_tokens: maxTokens.value,
-    },
-    (chunk) => {
-      assistantMsg.content += chunk
-      scrollToBottom()
-    },
-    () => {
+  if (selectedModel.value._external) {
+    await streamExternal(assistantMsg, apiMessages)
+  } else {
+    chatCompletionsStream(
+      { model: selectedModel.value.id, messages: apiMessages, temperature: temperature.value, max_tokens: maxTokens.value },
+      (chunk) => { assistantMsg.content += chunk; scrollToBottom() },
+      () => { streaming.value = false },
+      (err) => { assistantMsg.content = `Error: ${err.message}`; streaming.value = false }
+    )
+  }
+}
+
+async function streamExternal(assistantMsg: ChatMessage, apiMessages: ChatMessage[]) {
+  try {
+    const res = await fetch(`${externalApi.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${externalApi.apiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'aitra',
+      },
+      body: JSON.stringify({
+        model: selectedModel.value!.id,
+        messages: apiMessages,
+        stream: true,
+        temperature: temperature.value,
+        max_tokens: maxTokens.value,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      assistantMsg.content = `Error ${res.status}: ${err.error?.message || res.statusText}`
       streaming.value = false
-    },
-    (err) => {
-      assistantMsg.content = `Error: ${err.message}`
-      streaming.value = false
+      return
     }
-  )
+
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const chunk = decoder.decode(value, { stream: true })
+      for (const line of chunk.split('\n')) {
+        const trimmed = line.replace(/^data: /, '').trim()
+        if (!trimmed || trimmed === '[DONE]') continue
+        try {
+          const json = JSON.parse(trimmed)
+          const text = json.choices?.[0]?.delta?.content ?? ''
+          if (text) { assistantMsg.content += text; await scrollToBottom() }
+        } catch { /* skip */ }
+      }
+    }
+  } catch (e: any) {
+    assistantMsg.content = `Error: ${e.message}`
+  } finally {
+    streaming.value = false
+  }
 }
 
 async function scrollToBottom() {
   await nextTick()
-  if (messagesEl.value) {
-    messagesEl.value.scrollTop = messagesEl.value.scrollHeight
-  }
+  if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
 }
 </script>
