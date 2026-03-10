@@ -178,6 +178,7 @@ export default {
     sortLike: 'Most Liked',
     total: '{count} models',
     empty: 'No models found',
+    noResults: 'No models match your search',
     clearSearch: 'Clear search',
     noDescription: 'No description',
     today: 'Today',

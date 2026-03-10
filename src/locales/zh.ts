@@ -179,6 +179,7 @@ export default {
     sortLike: '点赞最多',
     total: '共 {count} 个模型',
     empty: '暂无模型',
+    noResults: '没有找到相关模型',
     clearSearch: '清除搜索',
     noDescription: '暂无描述',
     today: '今天',
