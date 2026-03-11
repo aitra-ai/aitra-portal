@@ -4,10 +4,35 @@ import { useAuthStore } from '../stores/auth'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // ── Public ──────────────────────────────────────────────────────
     {
       path: '/',
       name: 'home',
       component: () => import('../views/HomeView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/models',
+      name: 'modelHub',
+      component: () => import('../views/ModelHubView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/datasets',
+      name: 'datasetHub',
+      component: () => import('../views/DatasetHubView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/spaces',
+      name: 'spaceHub',
+      component: () => import('../views/SpaceHubView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/datasets/:namespace/:name',
+      name: 'datasetDetail',
+      component: () => import('../views/DatasetDetailView.vue'),
       meta: { public: true },
     },
     {
@@ -28,22 +53,22 @@ const router = createRouter({
       component: () => import('../views/CallbackView.vue'),
       meta: { public: true },
     },
-    {
-      path: '/models',
-      name: 'modelHub',
-      component: () => import('../views/ModelHubView.vue'),
-      meta: { public: true },
-    },
+
+    // ── App (authenticated) ─────────────────────────────────────────
     {
       path: '/app',
       component: () => import('../views/LayoutView.vue'),
-      redirect: '/app/models',
+      redirect: '/app/playground',
       children: [
         {
-          path: 'models',
-          name: 'models',
+          path: 'playground',
+          name: 'playground',
           component: () => import('../views/ModelPlayground.vue'),
-          meta: { public: true },
+        },
+        // Legacy alias: /app/models → /app/playground
+        {
+          path: 'models',
+          redirect: '/app/playground',
         },
         {
           path: 'apikeys',
@@ -60,8 +85,15 @@ const router = createRouter({
           name: 'deployments',
           component: () => import('../views/DeploymentsView.vue'),
         },
+        {
+          path: 'billing',
+          name: 'billing',
+          component: () => import('../views/UsageView.vue'),
+        },
       ],
     },
+
+    // ── Admin (authenticated + admin role) ─────────────────────────
     {
       path: '/admin',
       component: () => import('../views/LayoutView.vue'),
@@ -74,13 +106,32 @@ const router = createRouter({
           meta: { requireAdmin: true },
         },
         {
-          path: 'external-models',
+          path: 'models',
           name: 'adminExternalModels',
           component: () => import('../views/AdminExternalModelsView.vue'),
           meta: { requireAdmin: true },
         },
+        // Legacy alias: /admin/external-models → /admin/models
+        {
+          path: 'external-models',
+          redirect: '/admin/models',
+        },
+        {
+          path: 'audit',
+          name: 'adminAudit',
+          component: () => import('../views/AdminAuditView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
+          path: 'gpu',
+          name: 'adminGPU',
+          component: () => import('../views/AdminGPUSkusView.vue'),
+          meta: { requireAdmin: true },
+        },
       ],
     },
+
+    // ── 404 ─────────────────────────────────────────────────────────
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
@@ -88,8 +139,9 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isLoggedIn) return '/login'
-  if (to.meta.requireAdmin && !auth.isAdmin) return '/app/models'
-  if ((to.path === '/login' || to.path === '/register') && auth.isLoggedIn) return '/app/models'
+  if (to.meta.requireAdmin && !auth.isAdmin) return '/app/playground'
+  // Redirect away from login/register if already logged in, but keep home/datasets/spaces accessible
+  if ((to.path === '/login' || to.path === '/register') && auth.isLoggedIn) return '/'
 })
 
 export default router

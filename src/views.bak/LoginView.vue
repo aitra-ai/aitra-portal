@@ -14,15 +14,11 @@
       </button>
 
       <!-- Logo -->
-      <div class="flex items-center gap-2.5 mb-6">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-             style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)">
-          <span class="text-white font-black text-xs tracking-tight">AI</span>
+      <div class="flex items-center gap-2 mb-6">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <span class="text-white font-bold text-sm">A</span>
         </div>
-        <div class="flex flex-col leading-none">
-          <span class="font-bold text-lg text-gray-900 tracking-wide">aitra</span>
-          <span class="text-gray-400 text-[9px] tracking-widest uppercase">AI Platform</span>
-        </div>
+        <span class="font-bold text-lg text-gray-900">aitra</span>
       </div>
 
       <h2 class="text-2xl font-bold text-gray-900 mb-6">{{ t('login.title') }}</h2>
@@ -137,7 +133,7 @@ async function oauthLogin(provider: 'github' | 'google') {
     localStorage.setItem('jwt_token', jwt)
     localStorage.setItem('user_info', JSON.stringify({ username }))
     auth.$patch({ token: jwt as any, userInfo: { username } as any })
-    router.push("/")
+    router.push('/app/models')
   } catch (err: any) {
     if (err?.message !== 'popup_closed') {
       errorMsg.value = err?.message || t('common.error')
@@ -154,7 +150,7 @@ async function handleLogin() {
     errorMsg.value = ''
     try {
       await auth.login(form)
-      router.push("/")
+      router.push('/app/models')
     } catch {
       errorMsg.value = t('login.error')
     } finally {

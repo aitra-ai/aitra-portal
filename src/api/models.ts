@@ -33,13 +33,15 @@ export const chatCompletions = (req: ChatRequest) =>
   api.post('/v1/chat/completions', { ...req, stream: false })
 
 // Streaming chat — returns raw fetch for SSE
+// authToken: if provided, use this token instead of jwt_token (used for platform API tokens)
 export const chatCompletionsStream = async (
   req: ChatRequest,
   onChunk: (text: string) => void,
   onDone: () => void,
-  onError: (err: Error) => void
+  onError: (err: Error) => void,
+  authToken?: string
 ) => {
-  const token = localStorage.getItem('jwt_token')
+  const token = authToken || localStorage.getItem('jwt_token')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',

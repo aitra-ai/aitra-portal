@@ -58,6 +58,8 @@ export const useAuthStore = defineStore('auth', () => {
     userInfo.value = null
     localStorage.removeItem('jwt_token')
     localStorage.removeItem('user_info')
+    // Clean up legacy shared key (before per-user keying was introduced)
+    localStorage.removeItem('external_api_config')
   }
 
   return { token, userInfo, isLoggedIn, username, isAdmin, login, logout }

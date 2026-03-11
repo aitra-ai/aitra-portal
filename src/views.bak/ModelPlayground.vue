@@ -7,8 +7,7 @@
           <h1 class="text-2xl font-bold text-gray-900">{{ t('models.title') }}</h1>
           <p class="text-gray-500 mt-1 text-sm">{{ t('models.subtitle') }}</p>
         </div>
-        <!-- Only show external API config for admin users -->
-        <el-button v-if="auth.isAdmin" :icon="Setting" @click="showApiConfig = true" size="small">
+        <el-button :icon="Setting" @click="showApiConfig = true" size="small">
           {{ externalApi.enabled ? t('models.externalApiActive') : t('models.connectApi') }}
           <el-badge v-if="externalApi.enabled" is-dot class="ml-1" />
         </el-button>
@@ -33,8 +32,7 @@
       </div>
 
       <el-empty v-else-if="models.length === 0" :description="t('models.noModels')" class="py-16">
-        <p class="text-gray-500 text-sm mb-2">{{ t('models.noModelsAdmin') }}</p>
-        <el-button v-if="auth.isAdmin" type="primary" @click="showApiConfig = true">{{ t('models.connectApi') }}</el-button>
+        <el-button type="primary" @click="showApiConfig = true">{{ t('models.connectApi') }}</el-button>
       </el-empty>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -236,9 +234,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Delete, Setting, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
-import { chatCompletionsStream } from '../api/models'
+import { listModels, chatCompletionsStream } from '../api/models'
 import api from '../api/index'
-import { listTokens, createToken } from '../api/tokens'
 import type { Model, ChatMessage } from '../api/models'
 
 const { t } = useI18n()
@@ -475,38 +472,18 @@ onMounted(async () => {
   }
 })
 
-// Platform API token cache (auto-created on first chat)
-let _platformToken: string | null = null
-
-async function getPlatformToken(): Promise<string | null> {
-  if (!auth.isLoggedIn) return null
-  if (_platformToken) return _platformToken
-  try {
-    const res = await listTokens(auth.username, 'aigateway')
-    const tokens = res.data?.data ?? []
-    if (tokens.length > 0) {
-      _platformToken = tokens[0].token
-      return _platformToken
-    }
-  } catch { /* no existing token */ }
-  // Auto-create platform token for this user
-  try {
-    const res = await createToken('aigateway', 'playground-auto')
-    _platformToken = res.data?.data?.token ?? null
-    return _platformToken
-  } catch {
-    return null
-  }
-}
-
 async function fetchModels() {
   loadingModels.value = true
   try {
     if (externalApi.enabled) {
       let list: Model[] = []
+      // Try fetching model list
       try {
         list = await fetchExternalModels(externalApi.baseUrl, externalApi.apiKey)
-      } catch { /* Fall back to manual list */ }
+      } catch {
+        // Fall back to manual list
+      }
+      // Merge with manual entries
       if (externalApi.manualModels) {
         const manual = parseManualModels(externalApi.manualModels, externalApi.name)
         const existing = new Set(list.map(m => m.id))
@@ -514,17 +491,8 @@ async function fetchModels() {
       }
       models.value = list
     } else {
-      // Load admin-configured platform models — public endpoint, no auth required
-      const res = await api.get('/public/llm_configs')
-      const publicModels: Array<{ model_name: string; provider: string; enabled: boolean }> = res.data?.data ?? []
-      models.value = publicModels
-        .filter(m => m.enabled)
-        .map(m => ({
-          id: m.model_name,
-          object: 'model',
-          created: 0,
-          owned_by: m.provider,
-        })) as (Model & { _external?: boolean })[]
+      const res = await listModels()
+      models.value = (res.data?.data ?? []) as (Model & { _external?: boolean })[]
     }
   } catch {
     models.value = []
@@ -574,14 +542,11 @@ async function sendMessage() {
   if (selectedModel.value._external) {
     await streamExternal(assistantMsg, apiMessages)
   } else {
-    // Get or auto-create platform API token for aigateway auth
-    const platformToken = await getPlatformToken()
     chatCompletionsStream(
       { model: selectedModel.value.id, messages: apiMessages, temperature: temperature.value, max_tokens: maxTokens.value },
       (chunk) => { assistantMsg.content += chunk; scrollToBottom() },
       () => { streaming.value = false },
-      (err) => { assistantMsg.content = `Error: ${err.message}`; streaming.value = false },
-      platformToken ?? undefined
+      (err) => { assistantMsg.content = `Error: ${err.message}`; streaming.value = false }
     )
   }
 }

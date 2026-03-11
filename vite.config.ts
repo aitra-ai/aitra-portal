@@ -41,6 +41,11 @@ export default defineConfig({
         target: 'http://localhost:8088',
         changeOrigin: true,
       },
+      // public routes (no auth) go to user server
+      '/api/v1/public': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      },
       // casdoor
       '/casdoor': {
         target: 'http://localhost:8000',

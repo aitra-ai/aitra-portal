@@ -83,7 +83,7 @@
 
         <!-- Model list for reference -->
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 class="font-semibold text-gray-800 text-sm mb-3">{{ t('openclaw.availableModels') }}</h3>
+          <h3 class="font-semibold text-gray-800 text-sm mb-3">可用模型</h3>
           <div v-if="modelsLoading" class="text-center py-4">
             <el-icon class="animate-spin text-blue-400"><Loading /></el-icon>
           </div>
