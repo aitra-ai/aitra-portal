@@ -140,6 +140,7 @@ const adminItems = [
   { to: '/admin/services', label: 'nav.adminServices',  icon: Tools },
   { to: '/admin/audit',    label: 'nav.usageAudit',     icon: Search },
   { to: '/admin/gpu',      label: 'nav.adminGPU',       icon: Monitor },
+  { to: '/admin/sandbox',  label: 'nav.adminSandbox',   icon: Grid },
 ]
 
 const navItems = computed(() => baseNavItems)

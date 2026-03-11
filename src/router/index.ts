@@ -30,6 +30,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/spaces/:namespace/:name',
+      name: 'spaceDetail',
+      component: () => import('../views/SpaceDetailView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/datasets/:namespace/:name',
       name: 'datasetDetail',
       component: () => import('../views/DatasetDetailView.vue'),
@@ -126,6 +132,12 @@ const router = createRouter({
           path: 'gpu',
           name: 'adminGPU',
           component: () => import('../views/AdminGPUSkusView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
+          path: 'sandbox',
+          name: 'adminSandbox',
+          component: () => import('../views/AdminSandboxView.vue'),
           meta: { requireAdmin: true },
         },
       ],
