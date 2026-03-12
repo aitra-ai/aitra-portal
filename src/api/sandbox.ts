@@ -32,7 +32,7 @@ export interface SandboxInstance {
 }
 
 export const listFeaturedSpaces = () =>
-  api.get<{ data: FeaturedSpace[] }>('/sandbox/featured')
+  api.get<{ data: FeaturedSpace[] }>('/public/sandbox/featured')
 
 export const launchSandbox = (namespace: string, name: string) =>
   api.post<{ data: SandboxInstance | { id: number; status: string } }>(
@@ -40,7 +40,7 @@ export const launchSandbox = (namespace: string, name: string) =>
   )
 
 export const getSandboxStatus = (id: number) =>
-  api.get<{ data: SandboxInstance }>(`/sandbox/instances/${id}/status`)
+  api.get<{ data: SandboxInstance }>(`/public/sandbox/instances/${id}/status`)
 
 export const stopSandbox = (id: number) =>
   api.delete(`/sandbox/instances/${id}`)
