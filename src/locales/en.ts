@@ -73,6 +73,7 @@ export default {
     usageAudit: 'Usage Audit',
     adminGPU: 'GPU SKUs',
     adminSandbox: 'Sandbox Mgmt',
+    profile: 'My Profile',
     register: 'Sign Up Free',
     login: 'Sign In',
   },
@@ -497,6 +498,11 @@ export default {
     skuAdded: 'SKU added',
     confirmDeleteSku: 'Delete SKU',
     skuDeleted: 'SKU deleted',
+  },
+  profile: {
+    goPlayground: 'Start an AI conversation',
+    manageKeys: 'Manage your API keys',
+    viewUsage: 'View usage statistics',
   },
   common: {
     loading: 'Loading...',

@@ -60,6 +60,13 @@ const router = createRouter({
       meta: { public: true },
     },
 
+    // ── Profile ─────────────────────────────────────────────────────
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('../views/ProfileView.vue'),
+    },
+
     // ── App (authenticated) ─────────────────────────────────────────
     {
       path: '/app',

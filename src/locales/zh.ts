@@ -73,6 +73,7 @@ export default {
     usageAudit: '用量审计',
     adminGPU: 'GPU 规格',
     adminSandbox: '沙盒管理',
+    profile: '个人主页',
     register: '免费注册',
     login: '登录',
   },
@@ -497,6 +498,11 @@ export default {
     skuAdded: '规格已添加',
     confirmDeleteSku: '确定删除规格',
     skuDeleted: '规格已删除',
+  },
+  profile: {
+    goPlayground: '开始 AI 对话',
+    manageKeys: '管理你的 API 密钥',
+    viewUsage: '查看用量统计',
   },
   common: {
     loading: '加载中...',

@@ -46,7 +46,10 @@
             </button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="playground">
+                <el-dropdown-item command="profile">
+                  <el-icon class="mr-1"><User /></el-icon>{{ t('nav.profile') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="playground" divided>
                   <el-icon class="mr-1"><ChatDotRound /></el-icon>{{ t('nav.playground') }}
                 </el-dropdown-item>
                 <el-dropdown-item command="apikeys">
@@ -78,6 +81,7 @@ import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
+import { User } from '@element-plus/icons-vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -106,7 +110,8 @@ function changeLang(lang: string) {
 }
 
 function handleCommand(cmd: string) {
-  if (cmd === 'playground') router.push('/app/playground')
+  if (cmd === 'profile') router.push('/profile')
+  else if (cmd === 'playground') router.push('/app/playground')
   else if (cmd === 'apikeys') router.push('/app/apikeys')
   else if (cmd === 'adminModels') router.push('/admin/models')
   else if (cmd === 'logout') {
