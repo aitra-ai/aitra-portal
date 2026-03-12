@@ -4,62 +4,68 @@
 
     <section class="py-6 px-6">
       <div class="max-w-7xl mx-auto">
-        <div class="mb-5">
+        <div class="mb-6">
           <h1 class="text-2xl font-bold text-gray-900">{{ t('spaceHub.title') }}</h1>
           <p class="text-gray-500 text-sm mt-1">{{ t('spaceHub.subtitle') }}</p>
         </div>
 
-        <HubToolbar
-          v-model:search-query="searchQuery"
-          v-model:sort-by="sortBy"
-          v-model:view-mode="viewMode"
-          :total="total"
-          class="mb-4"
-          @update:search-query="onSearchChange"
-          @update:sort-by="onSortChange"
-        />
-
-        <div v-if="loading" class="flex justify-center py-24">
+        <!-- Featured Sandbox Spaces -->
+        <div v-if="featuredLoading" class="flex justify-center py-16">
           <el-icon class="animate-spin text-blue-500 text-4xl"><Loading /></el-icon>
         </div>
 
+        <div v-else-if="featuredSpaces.length > 0">
+          <h2 class="text-base font-semibold text-gray-700 mb-3">
+            🚀 {{ t('spaceHub.featured') }}
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
+            <div
+              v-for="sp in featuredSpaces"
+              :key="sp.id"
+              class="bg-white rounded-2xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+              @click="openSpace(sp)"
+            >
+              <!-- Cover / Icon -->
+              <div class="h-36 overflow-hidden relative">
+                <img
+                  v-if="sp.cover_url"
+                  :src="sp.cover_url"
+                  class="w-full h-full object-cover"
+                  :alt="sp.display_name"
+                />
+                <div
+                  v-else
+                  class="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
+                >
+                  <span class="text-5xl">🚀</span>
+                </div>
+                <!-- Template badge -->
+                <el-tag
+                  size="small"
+                  class="absolute top-2 right-2 opacity-90"
+                >{{ sp.template }}</el-tag>
+              </div>
+
+              <!-- Body -->
+              <div class="p-4">
+                <div class="font-semibold text-gray-800 text-sm mb-1 truncate">{{ sp.display_name }}</div>
+                <p class="text-gray-400 text-xs line-clamp-2 mb-3 min-h-[2rem]">{{ sp.description }}</p>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-gray-400 font-mono truncate max-w-[120px]">{{ sp.space_path }}</span>
+                  <el-button type="primary" size="small" @click.stop="openSpace(sp)">
+                    {{ t('sandbox.launch') }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <el-empty
-          v-else-if="spaces.length === 0"
-          :description="searchQuery ? t('modelHub.noResults') : t('modelHub.empty')"
+          v-else-if="!featuredLoading"
+          :description="t('spaceHub.noFeatured')"
           class="py-24"
-        >
-          <el-button v-if="searchQuery" @click="clearSearch">{{ t('modelHub.clearSearch') }}</el-button>
-        </el-empty>
-
-        <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <RepoCard
-            v-for="sp in spaces"
-            :key="sp.path"
-            :item="sp"
-            type="space"
-            layout="grid"
-          />
-        </div>
-
-        <div v-else class="space-y-2">
-          <RepoCard
-            v-for="sp in spaces"
-            :key="sp.path"
-            :item="sp"
-            type="space"
-            layout="list"
-          />
-        </div>
-
-        <div v-if="total > perPage" class="flex justify-center mt-8">
-          <el-pagination
-            v-model:current-page="page"
-            :page-size="perPage"
-            :total="total"
-            layout="prev, pager, next"
-            @current-change="fetchSpaces"
-          />
-        </div>
+        />
       </div>
     </section>
   </div>
@@ -67,68 +73,37 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Loading } from '@element-plus/icons-vue'
 import TopNav from '../components/TopNav.vue'
-import RepoCard from '../components/RepoCard.vue'
-import HubToolbar from '../components/HubToolbar.vue'
-import api from '../api/index'
+import { listFeaturedSpaces, type FeaturedSpace } from '../api/sandbox'
 
 const { t } = useI18n()
+const router = useRouter()
 
-interface RepoItem {
-  path: string
-  name: string
-  nickname?: string
-  description?: string
-  private: boolean
-  likes?: number
-  downloads?: number
-  updated_at?: string
-}
+const featuredSpaces = ref<FeaturedSpace[]>([])
+const featuredLoading = ref(false)
 
-const spaces = ref<RepoItem[]>([])
-const loading = ref(false)
-const searchQuery = ref('')
-const sortBy = ref('recently_update')
-const viewMode = ref<'grid' | 'list'>('grid')
-const page = ref(1)
-const total = ref(0)
-const perPage = 24
-
-let searchTimer: ReturnType<typeof setTimeout>
-
-function onSearchChange(val: string) {
-  searchQuery.value = val
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; fetchSpaces() }, 400)
-}
-
-function onSortChange(val: string) {
-  sortBy.value = val
-  page.value = 1
-  fetchSpaces()
-}
-
-function clearSearch() {
-  searchQuery.value = ''
-  page.value = 1
-  fetchSpaces()
-}
-
-async function fetchSpaces() {
-  loading.value = true
+async function loadFeaturedSpaces() {
+  featuredLoading.value = true
   try {
-    const params = new URLSearchParams({ per: String(perPage), page: String(page.value), sort: sortBy.value })
-    if (searchQuery.value) params.set('search', searchQuery.value)
-    const res = await api.get<{ data: RepoItem[]; total: number }>(`/spaces?${params}`)
-    spaces.value = res.data?.data ?? []
-    total.value = res.data?.total ?? spaces.value.length
+    const res = await listFeaturedSpaces()
+    const data = (res.data as any)?.data ?? res.data
+    featuredSpaces.value = Array.isArray(data) ? data.filter((s: FeaturedSpace) => s.enabled) : []
   } catch {
-    spaces.value = []
+    featuredSpaces.value = []
   } finally {
-    loading.value = false
+    featuredLoading.value = false
   }
 }
 
-onMounted(fetchSpaces)
+function openSpace(sp: FeaturedSpace) {
+  const [ns, name] = sp.space_path.split('/')
+  if (ns && name) {
+    router.push({ name: 'spaceDetail', params: { namespace: ns, name } })
+  }
+}
+
+onMounted(loadFeaturedSpaces)
 </script>

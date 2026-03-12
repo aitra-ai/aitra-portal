@@ -309,6 +309,8 @@ export default {
   spaceHub: {
     title: 'Spaces',
     subtitle: 'Explore all available application spaces on the platform',
+    featured: 'Featured Spaces',
+    noFeatured: 'No spaces available yet. Check back later!',
   },
   sandbox: {
     launch: 'Launch Sandbox',

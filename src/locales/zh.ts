@@ -309,6 +309,8 @@ export default {
   spaceHub: {
     title: 'Spaces 广场',
     subtitle: '探索平台上所有可用的应用空间',
+    featured: '精选 Spaces',
+    noFeatured: '暂无可用的 Space，管理员可在后台添加',
   },
   sandbox: {
     launch: '启动沙盒',
