@@ -499,6 +499,12 @@ export default {
     confirmDeleteSku: '确定删除规格',
     skuDeleted: '规格已删除',
   },
+  layout: {
+    aiPlatform: 'AI 平台',
+    adminPanel: '管理后台',
+    goAdmin: '进入管理后台',
+    backToApp: '返回用户端',
+  },
   profile: {
     goPlayground: '开始 AI 对话',
     manageKeys: '管理你的 API 密钥',

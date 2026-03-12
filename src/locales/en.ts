@@ -499,6 +499,12 @@ export default {
     confirmDeleteSku: 'Delete SKU',
     skuDeleted: 'SKU deleted',
   },
+  layout: {
+    aiPlatform: 'AI Platform',
+    adminPanel: 'Admin Panel',
+    goAdmin: 'Admin Panel',
+    backToApp: 'Back to App',
+  },
   profile: {
     goPlayground: 'Start an AI conversation',
     manageKeys: 'Manage your API keys',
