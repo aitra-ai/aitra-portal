@@ -234,9 +234,41 @@
           <el-dialog
             v-model="importDialogVisible"
             :title="t('modelHub.hfSync.importTitle')"
-            width="480px"
+            width="600px"
             :close-on-click-modal="false"
           >
+            <!-- Metadata loading -->
+            <div v-if="detailLoading" class="flex items-center gap-2 mb-4 text-sm text-gray-500 py-2">
+              <el-icon class="animate-spin"><Loading /></el-icon>
+              {{ t('modelHub.hfSync.loadingMeta') }}
+            </div>
+
+            <!-- File list preview -->
+            <div v-if="hfDetail && !detailLoading" class="mb-4 bg-gray-50 rounded-lg border border-gray-200 p-3">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-gray-600">{{ t('modelHub.hfSync.fileList') }}</span>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span>{{ hfDetail.files.length }} {{ t('modelHub.hfSync.files') }}</span>
+                  <el-tag v-if="hfDetail.has_lfs" type="warning" size="small" effect="plain">LFS</el-tag>
+                </div>
+              </div>
+              <div class="max-h-32 overflow-y-auto space-y-1">
+                <div
+                  v-for="f in hfDetail.files.slice(0, 30)"
+                  :key="f.path"
+                  class="flex items-center justify-between text-xs font-mono"
+                >
+                  <span class="text-gray-700 truncate max-w-[300px]">
+                    {{ f.type === 'directory' ? '📁' : '📄' }} {{ f.path }}
+                  </span>
+                  <span class="text-gray-400 shrink-0 ml-2">
+                    {{ f.lfs ? formatSize(f.lfs.size) : (f.size ? formatSize(f.size) : '') }}
+                    <el-tag v-if="f.lfs" type="warning" size="small" class="ml-1">lfs</el-tag>
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <el-form label-width="110px" label-position="left">
               <el-form-item :label="t('modelHub.hfSync.hfModelId')">
                 <el-input :model-value="importForm.hf_model_id" disabled />
@@ -257,13 +289,25 @@
               <el-form-item :label="t('modelHub.hfSync.syncLfs')">
                 <div class="flex items-center gap-2">
                   <el-checkbox v-model="importForm.sync_lfs" />
-                  <span class="text-xs text-gray-400">{{ t('modelHub.hfSync.syncLfsTip') }}</span>
+                  <span class="text-xs" :class="hfDetail?.has_lfs ? 'text-orange-500 font-medium' : 'text-gray-400'">
+                    {{ hfDetail?.has_lfs ? t('modelHub.hfSync.syncLfsRequired') : t('modelHub.hfSync.syncLfsTip') }}
+                  </span>
                 </div>
               </el-form-item>
               <el-form-item :label="t('modelHub.hfSync.description')">
-                <el-input v-model="importForm.description" type="textarea" :rows="3" />
+                <el-input v-model="importForm.description" type="textarea" :rows="3"
+                  :placeholder="t('modelHub.hfSync.descPlaceholder')" />
               </el-form-item>
             </el-form>
+
+            <!-- README preview -->
+            <div v-if="hfDetail?.readme" class="mt-2">
+              <div class="text-xs font-semibold text-gray-500 mb-1">README 预览</div>
+              <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono">
+                {{ hfDetail.readme.slice(0, 500) }}{{ hfDetail.readme.length > 500 ? '...' : '' }}
+              </div>
+            </div>
+
             <template #footer>
               <el-button @click="importDialogVisible = false">{{ t('common.cancel') }}</el-button>
               <el-button type="primary" :loading="importing" @click="doImport">
@@ -290,8 +334,8 @@ import { useAuthStore } from '../stores/auth'
 import api from '../api/index'
 import { listMyDeployments, stopDeployment, deleteDeployment } from '../api/gpu'
 import type { DeploymentWithCost } from '../api/gpu'
-import { searchHFModels, importHFModel } from '../api/hf'
-import type { HFModel } from '../api/hf'
+import { searchHFModels, importHFModel, fetchHFModelDetail } from '../api/hf'
+import type { HFModel, HFModelDetail } from '../api/hf'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -502,6 +546,8 @@ function formatNum(n: number): string {
 // Import dialog
 const importDialogVisible = ref(false)
 const importing = ref(false)
+const detailLoading = ref(false)
+const hfDetail = ref<HFModelDetail | null>(null)
 const importForm = reactive({
   hf_model_id: '',
   target_name: '',
@@ -510,13 +556,40 @@ const importForm = reactive({
   sync_lfs: false,
 })
 
-function openImportDialog(model: HFModel) {
+function formatSize(bytes: number): string {
+  if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB'
+  if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(1) + ' MB'
+  if (bytes >= 1_024) return (bytes / 1_024).toFixed(1) + ' KB'
+  return bytes + ' B'
+}
+
+async function openImportDialog(model: HFModel) {
   importForm.hf_model_id = model.id
   importForm.target_name = model.id.split('/').pop() ?? model.id
   importForm.description = ''
-  importForm.license = 'other'
+  importForm.license = model.cardData?.license ?? 'other'
   importForm.sync_lfs = false
+  hfDetail.value = null
   importDialogVisible.value = true
+
+  // Fetch full metadata in background
+  detailLoading.value = true
+  try {
+    const res = await fetchHFModelDetail(model.id)
+    hfDetail.value = res.data?.data ?? null
+    if (hfDetail.value) {
+      // Auto-check sync_lfs if model has LFS files
+      if (hfDetail.value.has_lfs) importForm.sync_lfs = true
+      // Auto-fill license from model card
+      if (!importForm.license || importForm.license === 'other') {
+        importForm.license = hfDetail.value.info?.cardData?.license ?? 'other'
+      }
+    }
+  } catch {
+    // non-fatal, proceed without detail
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 async function doImport() {
