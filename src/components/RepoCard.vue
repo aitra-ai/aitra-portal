@@ -96,9 +96,10 @@ const { t } = useI18n()
 
 const cardLink = computed(() => {
   const [ns, nm] = props.item.path.split('/')
+  if (!ns || !nm) return '#'
   if (props.type === 'dataset') return `/datasets/${ns}/${nm}`
   if (props.type === 'space') return `/spaces/${ns}/${nm}`
-  return '#'
+  return `/models/${ns}/${nm}`
 })
 
 const avatarChar = computed(() =>

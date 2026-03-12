@@ -55,8 +55,8 @@
                 <el-dropdown-item command="apikeys">
                   <el-icon class="mr-1"><Key /></el-icon>{{ t('nav.apikeys') }}
                 </el-dropdown-item>
-                <el-dropdown-item v-if="auth.isAdmin" command="adminModels" divided>
-                  <el-icon class="mr-1"><Setting /></el-icon>{{ t('nav.externalModels') }}
+                <el-dropdown-item v-if="auth.isAdmin" command="admin" divided>
+                  <el-icon class="mr-1"><Setting /></el-icon>{{ t('layout.adminPanel') }}
                 </el-dropdown-item>
                 <el-dropdown-item command="logout" :divided="!auth.isAdmin">
                   <el-icon class="mr-1"><SwitchButton /></el-icon>{{ t('common.logout') }}
@@ -113,7 +113,7 @@ function handleCommand(cmd: string) {
   if (cmd === 'profile') router.push('/profile')
   else if (cmd === 'playground') router.push('/app/playground')
   else if (cmd === 'apikeys') router.push('/app/apikeys')
-  else if (cmd === 'adminModels') router.push('/admin/models')
+  else if (cmd === 'admin') router.push('/admin/services')
   else if (cmd === 'logout') {
     auth.logout()
     router.push('/')

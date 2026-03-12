@@ -56,6 +56,20 @@ export default {
       title: 'Ready to get started?',
       desc: 'Sign up for free and explore all platform features',
       btn: 'Sign Up Free',
+      goWorkspace: 'Go to Workspace',
+    },
+    stat: {
+      aiModels: 'AI Models',
+      modelRepos: 'Model Repos',
+      datasets: 'Datasets',
+    },
+    hub: {
+      modelsTitle: 'Model Hub',
+      modelsDesc: 'Browse and use versioned AI model repositories',
+      datasetsTitle: 'Datasets',
+      datasetsDesc: 'Explore public and private training datasets',
+      spacesTitle: 'Spaces',
+      spacesDesc: 'Launch interactive AI apps in one click',
     },
   },
   nav: {

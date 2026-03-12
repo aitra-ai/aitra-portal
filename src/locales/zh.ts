@@ -56,6 +56,20 @@ export default {
       title: '准备好开始了吗？',
       desc: '免费注册，立即体验平台全部功能',
       btn: '免费注册',
+      goWorkspace: '进入工作台',
+    },
+    stat: {
+      aiModels: 'AI 模型',
+      modelRepos: '模型仓库',
+      datasets: '数据集',
+    },
+    hub: {
+      modelsTitle: '模型广场',
+      modelsDesc: '浏览和使用版本化的 AI 模型仓库',
+      datasetsTitle: '数据集',
+      datasetsDesc: '探索公开和私有的训练数据集',
+      spacesTitle: 'Spaces',
+      spacesDesc: '一键启动交互式 AI 应用',
     },
   },
   nav: {
