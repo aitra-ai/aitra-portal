@@ -1,5 +1,19 @@
-# Vue 3 + TypeScript + Vite
+# aitra-portal
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Web portal for the [Aitra](https://github.com/aitra-ai) unified AI service platform — model marketplace, playground, API-key management, deployment orchestration, and admin dashboards (billing, rate limits, MCP, skills).
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+Built with Vue 3 + TypeScript + Vite + Element Plus. Backend: [aitra-server](https://github.com/aitra-ai/aitra-server).
+
+## Development
+
+```bash
+npm install
+cp .env.example .env   # point VITE_API_BASE / VITE_CASDOOR_URL at your aitra-server & Casdoor
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```

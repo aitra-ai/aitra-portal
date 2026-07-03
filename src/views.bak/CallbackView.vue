@@ -32,7 +32,7 @@ const auth = useAuthStore()
 const error = ref('')
 
 onMounted(() => {
-  // csghub-server redirects here with ?jwt=xxx after successful OAuth
+  // aitra-server redirects here with ?jwt=xxx after successful OAuth
   const jwt = (route.query.jwt ?? '') as string
   const errorCode = route.query.error_code as string
   const errorMsg = route.query.error_message as string

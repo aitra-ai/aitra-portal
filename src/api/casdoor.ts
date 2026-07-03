@@ -3,8 +3,8 @@
 const CASDOOR_ORG = 'OpenCSG'
 const CASDOOR_APP = 'CSGHub'
 const CASDOOR_CLIENT_ID = '7a97bc5168cb75ffc514'
-const CASDOOR_URL = import.meta.env.VITE_CASDOOR_URL || 'http://10.100.18.37:8000'
-const API_CALLBACK_URL = `${import.meta.env.VITE_API_BASE || 'http://10.100.18.37:8080'}/api/v1/callback/casdoor`
+const CASDOOR_URL = import.meta.env.VITE_CASDOOR_URL || 'http://localhost:8000'
+const API_CALLBACK_URL = `${import.meta.env.VITE_API_BASE || 'http://localhost:8080'}/api/v1/callback/casdoor`
 
 /**
  * Open Casdoor OAuth in a popup window.
