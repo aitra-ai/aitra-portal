@@ -94,6 +94,9 @@ const navTabs = computed(() => [
   { to: '/models', label: t('nav.modelSquare') },
   { to: '/datasets', label: t('nav.datasets') },
   { to: '/spaces', label: t('nav.spaces') },
+  { to: '/mcp', label: t('nav.mcp') },
+  { to: '/skills', label: t('nav.skills') },
+  { to: '/docs', label: t('nav.docs') },
 ])
 
 const avatarLetter = computed(() =>

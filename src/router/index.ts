@@ -42,6 +42,24 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/mcp',
+      name: 'mcpServices',
+      component: () => import('../views/MCPServicesView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/skills',
+      name: 'skillsPublic',
+      component: () => import('../views/SkillsView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/docs',
+      name: 'docs',
+      component: () => import('../views/DocsView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
@@ -78,6 +96,11 @@ const router = createRouter({
           name: 'playground',
           component: () => import('../views/ModelPlayground.vue'),
         },
+        {
+          path: 'model-dashboard',
+          name: 'modelDashboard',
+          component: () => import('../views/ModelDashboardView.vue'),
+        },
         // Legacy alias: /app/models → /app/playground
         {
           path: 'models',
@@ -92,11 +115,6 @@ const router = createRouter({
           path: 'openclaw',
           name: 'openclaw',
           component: () => import('../views/OpenClawView.vue'),
-        },
-        {
-          path: 'deployments',
-          name: 'deployments',
-          component: () => import('../views/DeploymentsView.vue'),
         },
         {
           path: 'billing',
@@ -142,9 +160,33 @@ const router = createRouter({
           meta: { requireAdmin: true },
         },
         {
+          path: 'mcp',
+          name: 'adminMCP',
+          component: () => import('../views/AdminMCPView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
           path: 'sandbox',
           name: 'adminSandbox',
           component: () => import('../views/AdminSandboxView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
+          path: 'rate-limits',
+          name: 'adminRateLimits',
+          component: () => import('../views/AdminRateLimitsView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
+          path: 'skills',
+          name: 'adminSkills',
+          component: () => import('../views/AdminSkillsView.vue'),
+          meta: { requireAdmin: true },
+        },
+        {
+          path: 'credits',
+          name: 'admin-credits',
+          component: () => import('../views/AdminCreditsView.vue'),
           meta: { requireAdmin: true },
         },
       ],

@@ -2,27 +2,27 @@
   <div class="min-h-screen bg-gray-50">
     <TopNav />
 
-    <!-- Hero -->
-    <section class="bg-white border-b border-gray-100 py-16 px-6">
+    <!-- Hero — "One API, All Models" -->
+    <section class="bg-gradient-to-b from-gray-900 to-gray-800 py-20 px-6">
       <div class="max-w-4xl mx-auto text-center">
-        <div class="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full mb-6 border border-blue-100">
-          <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+        <div class="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-6 border border-blue-400/30">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
           {{ t('home.hero.badge') }}
         </div>
-        <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4 leading-tight">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-4 leading-tight">
           {{ t('home.heroTitle') }}
         </h1>
-        <p class="text-lg text-gray-500 mb-8 max-w-2xl mx-auto">
+        <p class="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
           {{ t('home.heroSubtitle') }}
         </p>
 
-        <!-- CTA: 未登录 vs 已登录 -->
-        <div class="flex items-center justify-center gap-3 flex-wrap">
+        <!-- CTA -->
+        <div class="flex items-center justify-center gap-3 flex-wrap mb-12">
           <template v-if="auth.isLoggedIn">
             <el-button size="large" type="primary" @click="router.push('/app/playground')" class="!px-8 !h-11">
               🚀 {{ t('home.cta.goWorkspace') }}
             </el-button>
-            <el-button size="large" @click="router.push('/models')" class="!px-8 !h-11">
+            <el-button size="large" @click="router.push('/app/model-dashboard')" class="!px-8 !h-11 !bg-white/10 !text-white !border-white/20 hover:!bg-white/20">
               {{ t('home.ctaBrowse') }}
             </el-button>
           </template>
@@ -30,10 +30,36 @@
             <el-button size="large" type="primary" @click="router.push('/register')" class="!px-8 !h-11">
               {{ t('home.cta.btn') }}
             </el-button>
-            <el-button size="large" @click="router.push('/models')" class="!px-8 !h-11">
-              {{ t('home.ctaBrowse') }}
+            <el-button size="large" @click="router.push('/docs')" class="!px-8 !h-11 !bg-white/10 !text-white !border-white/20 hover:!bg-white/20">
+              {{ t('nav.docs') }}
             </el-button>
           </template>
+        </div>
+
+        <!-- Code Example -->
+        <div class="max-w-lg mx-auto text-left">
+          <div class="text-xs text-gray-500 mb-2 font-medium">{{ t('home.codeExample.subtitle') }}</div>
+          <pre class="bg-black/50 backdrop-blur rounded-xl p-5 text-sm leading-relaxed overflow-x-auto border border-gray-700"><code><span class="text-gray-500">from</span> <span class="text-blue-400">openai</span> <span class="text-gray-500">import</span> <span class="text-blue-400">OpenAI</span>
+
+<span class="text-gray-400">client</span> <span class="text-gray-500">=</span> <span class="text-blue-400">OpenAI</span>(<span class="text-orange-400">base_url</span>=<span class="text-green-400">"{{ baseUrl }}/v1"</span>, <span class="text-orange-400">api_key</span>=<span class="text-green-400">"YOUR_KEY"</span>)
+<span class="text-gray-400">r</span> <span class="text-gray-500">=</span> <span class="text-gray-400">client</span>.<span class="text-blue-400">chat</span>.<span class="text-blue-400">completions</span>.<span class="text-blue-400">create</span>(<span class="text-orange-400">model</span>=<span class="text-green-400">"claude-sonnet-4-6"</span>, <span class="text-orange-400">messages</span>=[...])
+</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Provider logos -->
+    <section class="bg-white border-b border-gray-100 py-8 px-6">
+      <div class="max-w-4xl mx-auto">
+        <p class="text-xs text-gray-400 text-center mb-5 uppercase tracking-wider font-medium">
+          {{ t('home.providers.title') }}
+        </p>
+        <div class="flex items-center justify-center gap-8 flex-wrap">
+          <span v-for="p in providerLogos" :key="p.name"
+            class="text-sm font-semibold px-4 py-2 rounded-lg"
+            :style="{ backgroundColor: p.bg, color: p.color }">
+            {{ p.name }}
+          </span>
         </div>
       </div>
     </section>
@@ -58,53 +84,72 @@
       </div>
     </section>
 
-    <!-- Hub entry cards -->
-    <section class="py-10 px-6">
-      <div class="max-w-7xl mx-auto">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-12">
+    <!-- Selling points -->
+    <section class="py-16 px-6 bg-gray-50">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-12">
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ t('home.selling.title') }}</h2>
+          <p class="text-gray-500">{{ t('home.selling.subtitle') }}</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div v-for="point in sellingPoints" :key="point.key"
+            class="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-4" :class="point.iconBg">
+              <span class="text-xl">{{ point.icon }}</span>
+            </div>
+            <h3 class="font-semibold text-gray-900 mb-2">{{ t(`home.selling.${point.key}.title`) }}</h3>
+            <p class="text-sm text-gray-500 leading-relaxed">{{ t(`home.selling.${point.key}.desc`) }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hub entry cards (lower weight) -->
+    <section class="py-10 px-6 bg-white border-t border-gray-100">
+      <div class="max-w-5xl mx-auto">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           <router-link
             to="/models"
-            class="bg-white rounded-2xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md transition-all group"
+            class="bg-gray-50 rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-sm transition-all group"
           >
-            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
-              <span class="text-2xl">🧠</span>
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-xl">🧠</span>
+              <h3 class="font-semibold text-gray-900">{{ t('home.hub.modelsTitle') }}</h3>
             </div>
-            <h3 class="font-bold text-gray-900 mb-1">{{ t('home.hub.modelsTitle') }}</h3>
-            <p class="text-sm text-gray-500 mb-3">{{ t('home.hub.modelsDesc') }}</p>
-            <div class="flex items-center text-sm text-blue-600 font-medium">
-              {{ t('home.viewAll') }}
-              <el-icon class="ml-1 text-xs group-hover:translate-x-1 transition-transform"><ArrowRight /></el-icon>
-            </div>
+            <p class="text-sm text-gray-500">{{ t('home.hub.modelsDesc') }}</p>
           </router-link>
 
           <router-link
             to="/datasets"
-            class="bg-white rounded-2xl border border-gray-200 p-6 hover:border-green-300 hover:shadow-md transition-all group"
+            class="bg-gray-50 rounded-xl border border-gray-200 p-5 hover:border-green-300 hover:shadow-sm transition-all group"
           >
-            <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
-              <span class="text-2xl">📦</span>
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-xl">📦</span>
+              <h3 class="font-semibold text-gray-900">{{ t('home.hub.datasetsTitle') }}</h3>
             </div>
-            <h3 class="font-bold text-gray-900 mb-1">{{ t('home.hub.datasetsTitle') }}</h3>
-            <p class="text-sm text-gray-500 mb-3">{{ t('home.hub.datasetsDesc') }}</p>
-            <div class="flex items-center text-sm text-green-600 font-medium">
-              {{ t('home.viewAll') }}
-              <el-icon class="ml-1 text-xs group-hover:translate-x-1 transition-transform"><ArrowRight /></el-icon>
-            </div>
+            <p class="text-sm text-gray-500">{{ t('home.hub.datasetsDesc') }}</p>
           </router-link>
 
           <router-link
             to="/spaces"
-            class="bg-white rounded-2xl border border-gray-200 p-6 hover:border-purple-300 hover:shadow-md transition-all group"
+            class="bg-gray-50 rounded-xl border border-gray-200 p-5 hover:border-purple-300 hover:shadow-sm transition-all group"
           >
-            <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center mb-4 group-hover:bg-purple-100 transition-colors">
-              <span class="text-2xl">🚀</span>
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-xl">🚀</span>
+              <h3 class="font-semibold text-gray-900">{{ t('home.hub.spacesTitle') }}</h3>
             </div>
-            <h3 class="font-bold text-gray-900 mb-1">{{ t('home.hub.spacesTitle') }}</h3>
-            <p class="text-sm text-gray-500 mb-3">{{ t('home.hub.spacesDesc') }}</p>
-            <div class="flex items-center text-sm text-purple-600 font-medium">
-              {{ t('home.viewAll') }}
-              <el-icon class="ml-1 text-xs group-hover:translate-x-1 transition-transform"><ArrowRight /></el-icon>
+            <p class="text-sm text-gray-500">{{ t('home.hub.spacesDesc') }}</p>
+          </router-link>
+
+          <router-link
+            to="/mcp"
+            class="bg-gray-50 rounded-xl border border-gray-200 p-5 hover:border-orange-300 hover:shadow-sm transition-all group"
+          >
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-xl">🔌</span>
+              <h3 class="font-semibold text-gray-900">{{ t('home.hub.mcpTitle') }}</h3>
             </div>
+            <p class="text-sm text-gray-500">{{ t('home.hub.mcpDesc') }}</p>
           </router-link>
         </div>
 
@@ -112,7 +157,7 @@
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-xl font-bold text-gray-900">{{ t('home.featuredAiModels') }}</h2>
           <router-link
-            to="/models"
+            to="/app/model-dashboard"
             class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
           >
             {{ t('home.viewAll') }}
@@ -143,9 +188,18 @@
       </div>
     </section>
 
+    <!-- Bottom CTA -->
+    <section class="py-12 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-center" v-if="!auth.isLoggedIn">
+      <h2 class="text-2xl font-bold text-white mb-2">{{ t('home.cta.title') }}</h2>
+      <p class="text-blue-100 mb-6">{{ t('home.cta.desc') }}</p>
+      <el-button size="large" @click="router.push('/register')" class="!px-8 !h-11 !bg-white !text-blue-600 !border-0 hover:!bg-blue-50">
+        {{ t('home.cta.btn') }}
+      </el-button>
+    </section>
+
     <!-- Footer -->
     <footer class="py-8 border-t border-gray-100 text-center text-xs text-gray-400 mt-4">
-      © {{ new Date().getFullYear() }} aitra · AI Platform
+      © {{ new Date().getFullYear() }} aitra · AI Gateway Platform
     </footer>
   </div>
 </template>
@@ -163,6 +217,8 @@ import api from '../api/index'
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+
+const baseUrl = `${window.location.protocol}//${window.location.host}`
 
 interface AIModel {
   id: number
@@ -184,6 +240,21 @@ const stats = computed(() => ({
   modelRepos: modelRepoCount.value   || '—',
   datasets:   datasetCount.value     || '—',
 }))
+
+const providerLogos = [
+  { name: 'Anthropic', bg: '#f5f0e8', color: '#d97706' },
+  { name: 'OpenAI', bg: '#ecfdf5', color: '#10b981' },
+  { name: 'DeepSeek', bg: '#f0f9ff', color: '#0ea5e9' },
+  { name: 'Google', bg: '#eff6ff', color: '#3b82f6' },
+  { name: 'OpenRouter', bg: '#f5f3ff', color: '#6366f1' },
+]
+
+const sellingPoints = [
+  { key: 'unifiedApi', icon: '🔗', iconBg: 'bg-blue-50' },
+  { key: 'usageTracking', icon: '📊', iconBg: 'bg-green-50' },
+  { key: 'zeroCost', icon: '⚡', iconBg: 'bg-orange-50' },
+  { key: 'billing', icon: '💳', iconBg: 'bg-purple-50' },
+]
 
 function handleTryModel() {
   router.push(auth.isLoggedIn ? '/app/playground' : '/login')

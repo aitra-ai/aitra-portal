@@ -23,6 +23,7 @@ export interface ChatRequest {
   stream?: boolean
   temperature?: number
   max_tokens?: number
+  skill?: string
 }
 
 export const listModels = () =>

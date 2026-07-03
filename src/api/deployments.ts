@@ -74,8 +74,11 @@ export const searchModels = (search: string) =>
 export const createServerlessService = (namespace: string, name: string, data: {
   deploy_name: string
   runtime_framework_id: number
+  resource_id?: number
   min_replica: number
   max_replica: number
+  engine_args?: string
+  cluster_id?: string
 }) => api.post(`/models/${namespace}/${name}/serverless`, data)
 
 export const getServerlessService = (namespace: string, name: string) =>

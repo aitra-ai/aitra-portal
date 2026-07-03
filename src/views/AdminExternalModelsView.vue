@@ -9,10 +9,43 @@
             <h1 class="text-2xl font-bold text-gray-900">{{ t('admin.extModels.title') }}</h1>
             <p class="text-gray-500 mt-1 text-sm">{{ t('admin.extModels.subtitle') }}</p>
           </div>
-          <el-button type="primary" :icon="Plus" @click="openAddDialog">
-            {{ t('admin.extModels.addModel') }}
-          </el-button>
+          <div class="flex gap-2">
+            <el-button @click="showSyncDialog = true">
+              {{ t('admin.extModels.syncProvider') }}
+            </el-button>
+            <el-button type="primary" :icon="Plus" @click="openAddDialog">
+              {{ t('admin.extModels.addModel') }}
+            </el-button>
+          </div>
         </div>
+
+        <!-- Sync Provider Dialog -->
+        <el-dialog v-model="showSyncDialog" :title="t('admin.extModels.syncProvider')" width="500px">
+          <el-form label-position="top" class="space-y-3">
+            <el-form-item :label="t('admin.extModels.providerLabel')">
+              <el-select v-model="syncForm.provider" class="w-full">
+                <el-option label="OpenAI" value="openai" />
+                <el-option label="Anthropic" value="anthropic" />
+                <el-option label="DeepSeek" value="deepseek" />
+                <el-option label="OpenRouter" value="openrouter" />
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="t('models.apiKey')">
+              <el-input v-model="syncForm.apiKey" type="password" show-password placeholder="sk-..." />
+            </el-form-item>
+            <el-form-item :label="t('admin.extModels.modelsToSync')">
+              <el-input v-model="syncForm.models" type="textarea" :rows="3" placeholder="model-1, model-2, ..." />
+              <p class="text-xs text-gray-400 mt-1">{{ t('admin.extModels.modelsToSyncHint') }}</p>
+            </el-form-item>
+          </el-form>
+          <div v-if="syncResult" class="mt-3">
+            <el-alert :title="syncResult.msg" :type="syncResult.ok ? 'success' : 'error'" :closable="false" show-icon />
+          </div>
+          <template #footer>
+            <el-button @click="showSyncDialog = false">{{ t('admin.extModels.cancel') }}</el-button>
+            <el-button type="primary" :loading="syncing" @click="syncProvider">{{ t('admin.extModels.syncNow') }}</el-button>
+          </template>
+        </el-dialog>
 
         <!-- Config tip -->
         <el-alert type="success" :closable="false" class="mb-6" show-icon>
@@ -53,6 +86,7 @@
                   {{ t('admin.extModels.provider') }}: {{ model.provider || guessProvider(model.model_name) }}
                 </div>
                 <div class="text-xs text-gray-400 mt-0.5 font-mono truncate">{{ model.api_endpoint }}</div>
+                <div v-if="model.priority > 0" class="text-xs text-orange-500 mt-0.5">{{ t('admin.extModels.fallback') }} (priority: {{ model.priority }})</div>
               </div>
               <el-tag
                 :type="model.enabled ? 'success' : 'info'"
@@ -119,6 +153,11 @@
                 <p class="text-xs text-gray-400 mt-1">{{ t('admin.extModels.authHeaderHint') }}</p>
               </el-form-item>
 
+              <el-form-item :label="t('admin.extModels.priority')">
+                <el-input-number v-model="form.priority" :min="0" :max="99" />
+                <p class="text-xs text-gray-400 mt-1">{{ t('admin.extModels.priorityHint') }}</p>
+              </el-form-item>
+
               <div class="flex items-center gap-3 pt-1">
                 <span class="text-sm text-gray-700">{{ t('admin.extModels.enabledSwitch') }}</span>
                 <el-switch v-model="form.enabled" />
@@ -143,9 +182,14 @@
           <div>
             <h1 class="text-2xl font-bold text-gray-900">{{ t('billing.title') }}</h1>
           </div>
-          <el-button type="primary" :icon="Plus" @click="openAddBillingDialog">
-            {{ t('billing.addConfig') }}
-          </el-button>
+          <div class="flex gap-2">
+            <el-button type="success" @click="fillMarketPrices" :loading="fillingPrices">
+              {{ t('billing.fillMarketPrice') }}
+            </el-button>
+            <el-button type="primary" :icon="Plus" @click="openAddBillingDialog">
+              {{ t('billing.addConfig') }}
+            </el-button>
+          </div>
         </div>
 
         <!-- Billing table -->
@@ -266,6 +310,7 @@ interface LLMConfig {
   type: number
   enabled: boolean
   provider: string
+  priority: number
 }
 
 interface Preset {
@@ -333,6 +378,7 @@ const form = reactive({
   provider: '',
   auth_header: '',
   enabled: true,
+  priority: 0,
 })
 
 function resetForm() {
@@ -341,6 +387,7 @@ function resetForm() {
   form.provider = ''
   form.auth_header = ''
   form.enabled = true
+  form.priority = 0
 }
 
 function guessProvider(modelName: string): string {
@@ -368,6 +415,7 @@ function openEditDialog(model: LLMConfig) {
   editingModel.value = model
   form.auth_header = model.auth_header || ''
   form.enabled = model.enabled
+  form.priority = model.priority ?? 0
   dialogVisible.value = true
 }
 
@@ -382,7 +430,7 @@ async function deleteModel(model: LLMConfig) {
     return
   }
   try {
-    await api.delete(`/api/v1/admin/llm_configs/${model.id}`)
+    await api.delete(`/admin/llm_configs/${model.id}`)
     ElMessage.success(t('admin.extModels.deleteSuccess'))
     await loadConfigs()
   } catch {
@@ -398,19 +446,21 @@ async function saveForm() {
         ElMessage.warning(t('admin.extModels.requiredFields'))
         return
       }
-      await api.post('/api/v1/admin/llm_configs', {
+      await api.post('/admin/llm_configs', {
         model_name: form.model_name,
         api_endpoint: form.api_endpoint,
         provider: form.provider,
         auth_header: form.auth_header,
         enabled: form.enabled,
+        priority: form.priority,
       })
       ElMessage.success(t('admin.extModels.addSuccess'))
     } else {
       if (!editingModel.value) return
-      await api.put(`/api/v1/admin/llm_configs/${editingModel.value.id}`, {
+      await api.put(`/admin/llm_configs/${editingModel.value.id}`, {
         auth_header: form.auth_header,
         enabled: form.enabled,
+        priority: form.priority,
       })
       ElMessage.success(t('admin.extModels.saveSuccess'))
     }
@@ -426,12 +476,115 @@ async function saveForm() {
 async function loadConfigs() {
   loading.value = true
   try {
-    const res = await api.get<{ data: LLMConfig[] }>('/api/v1/admin/llm_configs')
+    const res = await api.get<{ data: LLMConfig[] }>('/admin/llm_configs')
     configs.value = res.data.data ?? []
   } catch {
     ElMessage.error('Failed to load configs')
   } finally {
     loading.value = false
+  }
+}
+
+// ── Sync Provider ──────────────────────────────────────────────────
+const showSyncDialog = ref(false)
+const syncing = ref(false)
+const syncResult = ref<{ ok: boolean; msg: string } | null>(null)
+const syncForm = reactive({
+  provider: 'openai',
+  apiKey: '',
+  models: '',
+})
+
+const PROVIDER_ENDPOINTS: Record<string, { endpoint: string; authKey: string }> = {
+  openai: { endpoint: 'https://api.openai.com/v1/chat/completions', authKey: 'Authorization' },
+  anthropic: { endpoint: 'https://api.anthropic.com/v1/messages', authKey: 'x-api-key' },
+  deepseek: { endpoint: 'https://api.deepseek.com/v1/chat/completions', authKey: 'Authorization' },
+  openrouter: { endpoint: 'https://openrouter.ai/api/v1/chat/completions', authKey: 'Authorization' },
+}
+
+async function syncProvider() {
+  if (!syncForm.apiKey || !syncForm.models.trim()) {
+    ElMessage.warning(t('admin.extModels.requiredFields'))
+    return
+  }
+  syncing.value = true
+  syncResult.value = null
+  try {
+    const provider = syncForm.provider
+    const pe = PROVIDER_ENDPOINTS[provider] ?? PROVIDER_ENDPOINTS.openai
+    const authHeader = provider === 'anthropic'
+      ? JSON.stringify({ 'x-api-key': syncForm.apiKey, 'anthropic-version': '2023-06-01' })
+      : JSON.stringify({ Authorization: `Bearer ${syncForm.apiKey}` })
+
+    const modelList = syncForm.models.split(',').map(m => m.trim()).filter(Boolean)
+    let created = 0
+    for (const modelName of modelList) {
+      try {
+        await api.post('/admin/llm_configs', {
+          model_name: modelName,
+          api_endpoint: pe.endpoint,
+          provider,
+          auth_header: authHeader,
+          enabled: true,
+        })
+        created++
+      } catch { /* skip duplicates */ }
+    }
+    syncResult.value = { ok: true, msg: `Synced ${created} models for ${provider}` }
+    await loadConfigs()
+  } catch (e: any) {
+    syncResult.value = { ok: false, msg: e.message || 'Sync failed' }
+  } finally {
+    syncing.value = false
+  }
+}
+
+// ── Market Prices Preset ───────────────────────────────────────────
+const MARKET_PRICES = [
+  { model_id: 'gpt-4o', provider: 'openai', price_input: 2.5, price_output: 10 },
+  { model_id: 'gpt-4o-mini', provider: 'openai', price_input: 0.15, price_output: 0.6 },
+  { model_id: 'claude-sonnet-4-6', provider: 'anthropic', price_input: 3, price_output: 15 },
+  { model_id: 'claude-opus-4-6', provider: 'anthropic', price_input: 15, price_output: 75 },
+  { model_id: 'claude-haiku-4-5-20251001', provider: 'anthropic', price_input: 0.8, price_output: 4 },
+  { model_id: 'deepseek-chat', provider: 'deepseek', price_input: 0.27, price_output: 1.1 },
+  { model_id: 'deepseek-reasoner', provider: 'deepseek', price_input: 0.55, price_output: 2.19 },
+  { model_id: 'gemini-2.5-pro', provider: 'google', price_input: 1.25, price_output: 10 },
+  { model_id: 'gemini-2.5-flash', provider: 'google', price_input: 0.15, price_output: 0.6 },
+]
+
+const fillingPrices = ref(false)
+
+async function fillMarketPrices() {
+  try {
+    await ElMessageBox.confirm(
+      t('billing.fillMarketPriceConfirm'),
+      t('billing.fillMarketPrice'),
+      { type: 'info', confirmButtonText: t('admin.extModels.save'), cancelButtonText: t('admin.extModels.cancel') }
+    )
+  } catch {
+    return
+  }
+
+  fillingPrices.value = true
+  const existingModels = new Set(billingConfigs.value.map(b => b.model_id))
+  const toCreate = MARKET_PRICES.filter(p => !existingModels.has(p.model_id))
+
+  if (toCreate.length === 0) {
+    ElMessage.info(t('billing.fillSkipped'))
+    fillingPrices.value = false
+    return
+  }
+
+  try {
+    for (const price of toCreate) {
+      await api.post('/admin/billing', price)
+    }
+    ElMessage.success(`${t('billing.fillSuccess')} (+${toCreate.length})`)
+    await loadBillingConfigs()
+  } catch {
+    ElMessage.error('Failed to fill market prices')
+  } finally {
+    fillingPrices.value = false
   }
 }
 
@@ -485,7 +638,7 @@ async function deleteBillingConfig(config: BillingConfig) {
     return
   }
   try {
-    await api.delete(`/api/v1/admin/billing/${config.id}`)
+    await api.delete(`/admin/billing/${config.id}`)
     ElMessage.success(t('billing.deleteSuccess'))
     await loadBillingConfigs()
   } catch {
@@ -501,7 +654,7 @@ async function saveBillingForm() {
         ElMessage.warning(t('admin.extModels.requiredFields'))
         return
       }
-      await api.post('/api/v1/admin/billing', {
+      await api.post('/admin/billing', {
         model_id: billingForm.model_id,
         provider: billingForm.provider,
         price_input: billingForm.price_input,
@@ -510,7 +663,7 @@ async function saveBillingForm() {
       ElMessage.success(t('billing.saveSuccess'))
     } else {
       if (!editingBilling.value) return
-      await api.put(`/api/v1/admin/billing/${editingBilling.value.id}`, {
+      await api.put(`/admin/billing/${editingBilling.value.id}`, {
         price_input: billingForm.price_input,
         price_output: billingForm.price_output,
       })
@@ -528,7 +681,7 @@ async function saveBillingForm() {
 async function loadBillingConfigs() {
   billingLoading.value = true
   try {
-    const res = await api.get<{ data: BillingConfig[] }>('/api/v1/admin/billing')
+    const res = await api.get<{ data: BillingConfig[] }>('/admin/billing')
     billingConfigs.value = res.data.data ?? []
   } catch {
     ElMessage.error('Failed to load billing configs')

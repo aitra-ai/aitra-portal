@@ -1,231 +1,283 @@
 <template>
   <div class="flex h-full">
-    <!-- Model List (left panel) -->
-    <div v-if="!selectedModel" class="flex-1 p-6">
-      <div class="flex items-start justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ t('models.title') }}</h1>
-          <p class="text-gray-500 mt-1 text-sm">{{ t('models.subtitle') }}</p>
-        </div>
-        <!-- Only show external API config for admin users -->
-        <el-button v-if="auth.isAdmin" :icon="Setting" @click="showApiConfig = true" size="small">
-          {{ externalApi.enabled ? t('models.externalApiActive') : t('models.connectApi') }}
-          <el-badge v-if="externalApi.enabled" is-dot class="ml-1" />
-        </el-button>
-      </div>
-
-      <!-- External API banner -->
-      <el-alert
-        v-if="externalApi.enabled"
-        :title="t('models.externalApiBanner', { name: externalApi.name || externalApi.baseUrl })"
-        type="success"
-        :closable="false"
-        class="mb-4"
-        show-icon
-      >
-        <template #default>
-          <el-button text size="small" @click="clearExternalApi">{{ t('models.disconnectApi') }}</el-button>
-        </template>
-      </el-alert>
-
-      <div v-if="loadingModels" class="flex justify-center py-20">
-        <el-icon class="animate-spin text-blue-500 text-3xl"><Loading /></el-icon>
-      </div>
-
-      <el-empty v-else-if="models.length === 0" :description="t('models.noModels')" class="py-16">
-        <p class="text-gray-500 text-sm mb-2">{{ t('models.noModelsAdmin') }}</p>
-        <el-button v-if="auth.isAdmin" type="primary" @click="showApiConfig = true">{{ t('models.connectApi') }}</el-button>
-      </el-empty>
-
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <div
-          v-for="model in models"
-          :key="model.id"
-          class="bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group"
-          @click="openPlayground(model)"
-        >
-          <div class="flex items-start justify-between mb-3">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-              :class="model._external ? 'bg-purple-50' : 'bg-blue-50'">
-              <el-icon :class="model._external ? 'text-purple-500' : 'text-blue-500'" class="text-xl">
-                <component :is="model._external ? 'Connection' : 'Cpu'" />
-              </el-icon>
-            </div>
-            <el-tag size="small" :type="model._external ? 'warning' : 'success'">
-              {{ model._external ? (externalApi.name || 'External') : (model.owned_by || 'platform') }}
-            </el-tag>
-          </div>
-          <h3 class="font-semibold text-gray-900 mb-1 truncate text-sm">{{ model.id }}</h3>
-          <p class="text-xs text-gray-400 mb-4">{{ model.object || 'language model' }}</p>
-          <el-button size="small" type="primary" class="w-full">
-            {{ t('models.tryIt') }}
-          </el-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chat Playground -->
-    <div v-else class="flex-1 flex flex-col bg-white">
+    <!-- Chat Playground (always visible) -->
+    <div class="flex-1 flex flex-col bg-white">
       <!-- Header -->
-      <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
-        <el-button text @click="selectedModel = null" :icon="ArrowLeft">
-          {{ t('models.backToList') }}
+      <div class="flex items-center gap-3 px-6 py-3 border-b border-gray-200 bg-white flex-wrap">
+        <!-- Model Selector -->
+        <el-select
+          v-if="!compareMode"
+          v-model="selectedModelId"
+          filterable
+          class="!w-56"
+          size="default"
+          :placeholder="t('models.selectModel')"
+          @change="onModelSelect"
+        >
+          <el-option
+            v-for="m in models"
+            :key="m.id"
+            :label="m.id"
+            :value="m.id"
+          >
+            <div class="flex items-center justify-between w-full">
+              <span>{{ m.id }}</span>
+              <span class="text-xs text-gray-400 ml-2">{{ m.owned_by }}</span>
+            </div>
+          </el-option>
+        </el-select>
+
+        <!-- Skill Selector -->
+        <el-select
+          v-if="skills.length > 0"
+          v-model="selectedSkillId"
+          :placeholder="t('skills.selectSkill')"
+          clearable
+          class="!w-48 ml-1"
+          size="small"
+          @change="onSkillChange"
+        >
+          <el-option
+            v-for="skill in skills"
+            :key="skill.id"
+            :label="`${skill.icon} ${skill.name}`"
+            :value="skill.id"
+          />
+        </el-select>
+
+        <div class="flex-1" />
+
+        <!-- Compare toggle -->
+        <el-button size="small" :type="compareMode ? 'primary' : 'default'" @click="toggleCompareMode">
+          {{ compareMode ? t('compare.exitCompare') : t('compare.compare') }}
         </el-button>
-        <div class="h-4 w-px bg-gray-300" />
-        <el-icon :class="selectedModel._external ? 'text-purple-500' : 'text-blue-500'">
-          <component :is="selectedModel._external ? 'Connection' : 'Cpu'" />
-        </el-icon>
-        <span class="font-semibold text-gray-800 text-sm truncate">{{ selectedModel.id }}</span>
-        <el-tag v-if="selectedModel._external" size="small" type="warning" class="shrink-0">
-          {{ externalApi.name || 'External' }}
-        </el-tag>
-        <el-button size="small" text class="ml-auto !text-gray-400" @click="clearChat" :icon="Delete">
+
+        <!-- Chat history -->
+        <el-popover placement="bottom-end" :width="260" trigger="click">
+          <template #reference>
+            <el-button size="small" text>{{ t('compare.history') }}</el-button>
+          </template>
+          <div v-if="chatHistoryList.length === 0" class="text-center text-gray-400 text-sm py-3">{{ t('compare.noHistory') }}</div>
+          <div v-else class="max-h-60 overflow-y-auto space-y-1">
+            <div
+              v-for="h in chatHistoryList"
+              :key="h.id"
+              class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm"
+              @click="loadChatHistory(h.id)"
+            >
+              <div class="truncate flex-1 text-gray-700">{{ h.title }}</div>
+              <el-button text size="small" class="!text-gray-300 hover:!text-red-400 shrink-0" @click.stop="deleteChatHistory(h.id)">✕</el-button>
+            </div>
+          </div>
+        </el-popover>
+
+        <el-button size="small" :type="showParamsPanel ? 'primary' : 'default'" text @click="showParamsPanel = !showParamsPanel">
+          {{ showParamsPanel ? '▲' : '▼' }} {{ t('models.params') }}
+        </el-button>
+        <el-button size="small" text class="!text-gray-400" @click="clearChat" :icon="Delete">
           {{ t('models.clearChat') }}
         </el-button>
-        <el-popover placement="bottom-end" :width="280" trigger="click">
+        <!-- Advanced params (top_p, frequency_penalty) -->
+        <el-popover placement="bottom-end" :width="240" trigger="click">
           <template #reference>
-            <el-button size="small" text :icon="Setting">{{ t('models.settings') }}</el-button>
+            <el-button size="small" text :icon="Setting">{{ t('models.advanced') }}</el-button>
           </template>
-          <div class="space-y-4 p-1">
+          <div class="space-y-3 p-1">
             <div>
-              <div class="text-sm text-gray-600 mb-2">{{ t('models.systemPrompt') }}</div>
-              <el-input v-model="systemPrompt" type="textarea" :rows="3" size="small" />
+              <div class="text-sm text-gray-600 mb-1">top_p: {{ topP }}</div>
+              <el-slider v-model="topP" :min="0" :max="1" :step="0.05" />
             </div>
             <div>
-              <div class="text-sm text-gray-600 mb-1">{{ t('models.temperature') }}: {{ temperature }}</div>
-              <el-slider v-model="temperature" :min="0" :max="2" :step="0.1" />
-            </div>
-            <div>
-              <div class="text-sm text-gray-600 mb-1">{{ t('models.maxTokens') }}</div>
-              <el-input-number v-model="maxTokens" :min="128" :max="8192" :step="128" size="small" class="w-full" />
+              <div class="text-sm text-gray-600 mb-1">frequency_penalty: {{ frequencyPenalty }}</div>
+              <el-slider v-model="frequencyPenalty" :min="-2" :max="2" :step="0.1" />
             </div>
           </div>
         </el-popover>
       </div>
 
-      <!-- Messages -->
-      <div ref="messagesEl" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
-          <div class="text-center text-gray-400">
-            <el-icon class="text-5xl mb-3 text-gray-200"><ChatDotRound /></el-icon>
-            <p class="text-sm">{{ t('models.subtitle') }}</p>
+      <!-- ═══ Single Model Chat ═══ -->
+      <template v-if="!compareMode">
+        <!-- Params Panel (collapsible) -->
+        <div v-if="showParamsPanel" class="border-b border-gray-100 bg-gray-50 px-6 py-3 transition-all">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl">
+            <div class="md:col-span-2">
+              <label class="text-xs font-medium text-gray-500 mb-1 block">System Prompt</label>
+              <el-input v-model="systemPrompt" type="textarea" :rows="2" size="small" :placeholder="t('promptTemplates.placeholder')" />
+            </div>
+            <div class="space-y-2">
+              <div>
+                <label class="text-xs font-medium text-gray-500">{{ t('models.temperature') }}: {{ temperature }}</label>
+                <el-slider v-model="temperature" :min="0" :max="2" :step="0.1" size="small" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500">{{ t('models.maxTokens') }}</label>
+                <el-input-number v-model="maxTokens" :min="128" :max="8192" :step="128" size="small" class="w-full" />
+              </div>
+            </div>
           </div>
         </div>
-        <template v-for="(msg, i) in messages" :key="i">
-          <div v-if="msg.role === 'user'" class="flex justify-end">
-            <div class="chat-bubble-user text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
-          </div>
-          <div v-else class="flex justify-start gap-3">
-            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
-              <span class="text-white text-xs font-bold">AI</span>
-            </div>
-            <div class="chat-bubble-ai text-sm leading-relaxed whitespace-pre-wrap">
-              <span v-if="msg.content">{{ msg.content }}</span>
-              <span v-else class="text-gray-400 italic">{{ t('models.thinking') }}</span>
+
+        <!-- Messages -->
+        <div ref="messagesEl" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div v-if="messages.length === 0 && !activeSkill" class="flex items-center justify-center h-full">
+            <div class="text-center text-gray-400">
+              <el-icon class="text-5xl mb-3 text-gray-200"><ChatDotRound /></el-icon>
+              <p class="text-sm">{{ t('models.subtitle') }}</p>
             </div>
           </div>
-        </template>
-      </div>
-
-      <!-- Input -->
-      <div class="px-6 py-4 border-t border-gray-200 bg-white">
-        <div class="flex gap-3 items-end">
-          <el-input
-            v-model="inputText"
-            type="textarea"
-            :rows="2"
-            :autosize="{ minRows: 2, maxRows: 5 }"
-            :placeholder="t('models.inputPlaceholder')"
-            resize="none"
-            @keydown.enter.exact.prevent="sendMessage"
-            @keydown.shift.enter="() => {}"
-            class="flex-1"
-          />
-          <el-button
-            type="primary"
-            :loading="streaming"
-            :disabled="!inputText.trim()"
-            @click="sendMessage"
-          >
-            <el-icon v-if="!streaming"><Promotion /></el-icon>
-            {{ t('models.send') }}
-          </el-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- External API Config Dialog -->
-    <el-dialog
-      v-model="showApiConfig"
-      :title="t('models.apiConfigTitle')"
-      width="500px"
-      :close-on-click-modal="false"
-    >
-      <div class="space-y-4">
-        <!-- Quick presets -->
-        <div>
-          <p class="text-sm text-gray-600 mb-2">{{ t('models.quickConnect') }}</p>
-          <div class="flex flex-wrap gap-2">
+          <!-- Conversation starters for active skill -->
+          <div v-if="activeSkill?.conversation_starters?.length && messages.filter(m => m.role === 'user').length === 0" class="flex flex-wrap gap-2 justify-center py-4">
             <el-button
-              v-for="preset in API_PRESETS"
-              :key="preset.name"
+              v-for="starter in activeSkill.conversation_starters"
+              :key="starter"
               size="small"
-              :type="apiForm.name === preset.name ? 'primary' : 'default'"
-              @click="applyPreset(preset)"
-            >{{ preset.name }}</el-button>
+              round
+              @click="inputText = starter; sendMessage()"
+            >{{ starter }}</el-button>
           </div>
+          <template v-for="(msg, i) in messages" :key="i">
+            <div v-if="msg.role === 'user'" class="flex justify-end">
+              <div class="chat-bubble-user text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+            </div>
+            <div v-else class="flex justify-start gap-3">
+              <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                <span class="text-white text-xs font-bold">AI</span>
+              </div>
+              <div class="chat-bubble-ai text-sm leading-relaxed markdown-body" v-if="msg.content" v-html="renderMarkdown(msg.content)"></div>
+              <div class="chat-bubble-ai text-sm leading-relaxed" v-else>
+                <span class="text-gray-400 italic">{{ t('models.thinking') }}</span>
+              </div>
+            </div>
+          </template>
         </div>
 
-        <el-divider />
-
-        <el-form :model="apiForm" label-position="top">
-          <el-form-item :label="t('models.apiProvider')">
-            <el-input v-model="apiForm.name" :placeholder="t('models.apiProviderPlaceholder')" />
-          </el-form-item>
-
-          <el-form-item :label="t('models.apiBaseUrl')">
-            <el-input v-model="apiForm.baseUrl" placeholder="https://api.openai.com/v1" />
-          </el-form-item>
-
-          <el-form-item :label="t('models.apiKey')">
-            <el-input v-model="apiForm.apiKey" type="password" show-password :placeholder="t('models.apiKeyPlaceholder')" />
-            <p v-if="apiForm.name === 'Claude (Anthropic)'" class="text-xs text-gray-400 mt-1">
-              {{ t('models.claudeTip') }}
-            </p>
-          </el-form-item>
-
-          <el-form-item :label="t('models.manualModels')">
+        <!-- Input -->
+        <div class="px-6 py-4 border-t border-gray-200 bg-white">
+          <div class="flex gap-3 items-end">
             <el-input
-              v-model="apiForm.manualModels"
+              v-model="inputText"
               type="textarea"
-              :rows="3"
-              :placeholder="t('models.manualModelsPlaceholder')"
+              :rows="2"
+              :autosize="{ minRows: 2, maxRows: 5 }"
+              :placeholder="t('models.inputPlaceholder')"
+              resize="none"
+              @keydown.enter.exact.prevent="sendMessage"
+              @keydown.shift.enter="() => {}"
+              class="flex-1"
             />
-            <p class="text-xs text-gray-400 mt-1">{{ t('models.manualModelsTip') }}</p>
-          </el-form-item>
-        </el-form>
-
-        <el-alert v-if="apiTestResult" :title="apiTestResult.msg" :type="apiTestResult.ok ? 'success' : 'error'" :closable="false" show-icon />
-      </div>
-
-      <template #footer>
-        <div class="flex justify-between items-center w-full">
-          <el-tooltip :content="t('models.syncToPlatformTip')" placement="top">
             <el-button
-              :loading="syncingToPlatform"
-              :disabled="!apiForm.apiKey"
-              :icon="Upload"
-              @click="syncToPlatform"
-            >{{ t('models.syncToPlatform') }}</el-button>
-          </el-tooltip>
-          <div class="flex gap-2">
-            <el-button @click="showApiConfig = false">{{ t('apikeys.cancel') }}</el-button>
-            <el-button :loading="testingApi" @click="testAndConnect">{{ t('models.testAndConnect') }}</el-button>
-            <el-button type="primary" :loading="connectingApi" @click="saveApiConfig">{{ t('models.saveConnect') }}</el-button>
+              type="primary"
+              :loading="streaming"
+              :disabled="!inputText.trim()"
+              @click="sendMessage"
+            >
+              <el-icon v-if="!streaming"><Promotion /></el-icon>
+              {{ t('models.send') }}
+            </el-button>
           </div>
         </div>
       </template>
+
+      <!-- ═══ Compare Mode (Split View) ═══ -->
+      <template v-else>
+        <div class="flex-1 flex overflow-hidden">
+          <!-- Left Panel -->
+          <div class="flex-1 flex flex-col border-r border-gray-200">
+            <div class="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+              <span class="text-xs font-semibold text-blue-600 uppercase">A</span>
+              <el-select v-model="compareModelA" :placeholder="t('compare.selectModel')" size="small" class="!flex-1">
+                <el-option v-for="m in models" :key="'a-' + m.id" :label="m.id" :value="m.id" />
+              </el-select>
+            </div>
+            <div ref="compareElA" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div v-if="compareMessagesA.length === 0" class="flex items-center justify-center h-full text-gray-300 text-sm">
+                {{ t('compare.waitingForInput') }}
+              </div>
+              <template v-for="(msg, i) in compareMessagesA" :key="'a-' + i">
+                <div v-if="msg.role === 'user'" class="flex justify-end">
+                  <div class="chat-bubble-user text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+                </div>
+                <div v-else class="flex justify-start gap-2">
+                  <div class="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                    <span class="text-white text-[10px] font-bold">A</span>
+                  </div>
+                  <div class="chat-bubble-ai text-sm leading-relaxed markdown-body" v-if="msg.content" v-html="renderMarkdown(msg.content)"></div>
+                  <div class="chat-bubble-ai text-sm leading-relaxed" v-else>
+                    <span class="text-gray-400 italic">{{ t('models.thinking') }}</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div class="flex-1 flex flex-col">
+            <div class="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+              <span class="text-xs font-semibold text-green-600 uppercase">B</span>
+              <el-select v-model="compareModelB" :placeholder="t('compare.selectModel')" size="small" class="!flex-1">
+                <el-option v-for="m in models" :key="'b-' + m.id" :label="m.id" :value="m.id" />
+              </el-select>
+            </div>
+            <div ref="compareElB" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div v-if="compareMessagesB.length === 0" class="flex items-center justify-center h-full text-gray-300 text-sm">
+                {{ t('compare.waitingForInput') }}
+              </div>
+              <template v-for="(msg, i) in compareMessagesB" :key="'b-' + i">
+                <div v-if="msg.role === 'user'" class="flex justify-end">
+                  <div class="chat-bubble-user text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+                </div>
+                <div v-else class="flex justify-start gap-2">
+                  <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center shrink-0 mt-0.5">
+                    <span class="text-white text-[10px] font-bold">B</span>
+                  </div>
+                  <div class="chat-bubble-ai text-sm leading-relaxed markdown-body" v-if="msg.content" v-html="renderMarkdown(msg.content)"></div>
+                  <div class="chat-bubble-ai text-sm leading-relaxed" v-else>
+                    <span class="text-gray-400 italic">{{ t('models.thinking') }}</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shared Input for Compare -->
+        <div class="px-6 py-4 border-t border-gray-200 bg-white">
+          <div class="flex gap-3 items-end">
+            <el-input
+              v-model="inputText"
+              type="textarea"
+              :rows="2"
+              :autosize="{ minRows: 2, maxRows: 5 }"
+              :placeholder="t('compare.inputPlaceholder')"
+              resize="none"
+              @keydown.enter.exact.prevent="sendCompareMessage"
+              @keydown.shift.enter="() => {}"
+              class="flex-1"
+            />
+            <el-button
+              type="primary"
+              :loading="compareStreamingA || compareStreamingB"
+              :disabled="!inputText.trim() || !compareModelA || !compareModelB"
+              @click="sendCompareMessage"
+            >
+              <el-icon v-if="!compareStreamingA && !compareStreamingB"><Promotion /></el-icon>
+              {{ t('models.send') }}
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Save Prompt Template Dialog -->
+    <el-dialog v-model="showSavePromptDialog" :title="t('promptTemplates.saveTitle')" width="360px">
+      <el-input v-model="newTemplateName" :placeholder="t('promptTemplates.namePlaceholder')" maxlength="50" />
+      <template #footer>
+        <el-button @click="showSavePromptDialog = false">{{ t('apikeys.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!newTemplateName.trim()" @click="savePromptTemplate">{{ t('promptTemplates.save') }}</el-button>
+      </template>
     </el-dialog>
+
+    <!-- External API Config removed — managed via Admin backend -->
   </div>
 </template>
 
@@ -233,30 +285,23 @@
 import { ref, reactive, computed, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Delete, Setting, Upload } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Delete, Setting, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { chatCompletionsStream } from '../api/models'
 import api from '../api/index'
 import { listTokens, createToken } from '../api/tokens'
 import type { Model, ChatMessage } from '../api/models'
+import { renderMarkdown } from '../utils/markdown'
 
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-// ── External API config ──────────────────────────────────────────────
-interface ExternalApiConfig {
-  enabled: boolean
-  name: string
-  baseUrl: string
-  apiKey: string
-  manualModels: string
-}
+// ── Models & Chat (External API removed — managed via Admin backend) ──
 
-// Key is per-user so one user's API keys never leak to another user's session
-const STORAGE_KEY = computed(() => auth.username ? `external_api_config_${auth.username}` : 'external_api_config_guest')
+// (External API dead code cleaned up — all functions moved to Admin backend)
 
 const API_PRESETS = [
   { name: 'Claude (Anthropic)', baseUrl: 'https://api.anthropic.com/v1', models: 'claude-opus-4-5,claude-sonnet-4-6,claude-3-5-sonnet-20241022,claude-3-5-haiku-20241022,claude-3-opus-20240229' },
@@ -452,25 +497,321 @@ function clearExternalApi() {
 const models = ref<(Model & { _external?: boolean })[]>([])
 const loadingModels = ref(false)
 const selectedModel = ref<(Model & { _external?: boolean }) | null>(null)
+const selectedModelId = ref('')
+
+function onModelSelect(modelId: string) {
+  const found = models.value.find(m => m.id === modelId)
+  if (found) {
+    selectedModel.value = found
+    localStorage.setItem('last_model', modelId)
+    messages.value = []
+  }
+}
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const streaming = ref(false)
 const messagesEl = ref<HTMLElement | null>(null)
+const showParamsPanel = ref(true)
 const systemPrompt = ref('')
 const temperature = ref(0.7)
 const maxTokens = ref(2048)
+const topP = ref(1.0)
+const frequencyPenalty = ref(0)
+const showPromptBar = ref(false)
+
+// ── Prompt Templates (localStorage) ──────────────────────────────
+interface PromptTemplate {
+  name: string
+  content: string  // system_prompt — compatible with AISkill structure
+}
+
+const PROMPT_TPL_KEY = 'aitra_prompt_templates'
+const MAX_TEMPLATES = 20
+const promptTemplates = ref<PromptTemplate[]>([])
+const showSavePromptDialog = ref(false)
+const newTemplateName = ref('')
+
+function loadPromptTemplates() {
+  try {
+    const raw = localStorage.getItem(PROMPT_TPL_KEY)
+    promptTemplates.value = raw ? JSON.parse(raw) : []
+  } catch {
+    promptTemplates.value = []
+  }
+}
+
+function savePromptTemplate() {
+  const name = newTemplateName.value.trim()
+  if (!name || !systemPrompt.value.trim()) return
+
+  // Update if exists, else prepend
+  const existing = promptTemplates.value.findIndex(t => t.name === name)
+  if (existing >= 0) {
+    promptTemplates.value[existing].content = systemPrompt.value
+  } else {
+    promptTemplates.value.unshift({ name, content: systemPrompt.value })
+    if (promptTemplates.value.length > MAX_TEMPLATES) {
+      promptTemplates.value = promptTemplates.value.slice(0, MAX_TEMPLATES)
+    }
+  }
+  localStorage.setItem(PROMPT_TPL_KEY, JSON.stringify(promptTemplates.value))
+  showSavePromptDialog.value = false
+  newTemplateName.value = ''
+  ElMessage.success(t('promptTemplates.saved'))
+}
+
+function loadPromptTemplate(tpl: PromptTemplate) {
+  systemPrompt.value = tpl.content
+}
+
+function deletePromptTemplate(name: string) {
+  promptTemplates.value = promptTemplates.value.filter(t => t.name !== name)
+  localStorage.setItem(PROMPT_TPL_KEY, JSON.stringify(promptTemplates.value))
+}
+
+// ── Compare Mode ─────────────────────────────────────────────────
+const compareMode = ref(false)
+const compareModelA = ref('')
+const compareModelB = ref('')
+const compareMessagesA = ref<ChatMessage[]>([])
+const compareMessagesB = ref<ChatMessage[]>([])
+const compareStreamingA = ref(false)
+const compareStreamingB = ref(false)
+const compareElA = ref<HTMLElement | null>(null)
+const compareElB = ref<HTMLElement | null>(null)
+
+function toggleCompareMode() {
+  compareMode.value = !compareMode.value
+  if (compareMode.value) {
+    // Pre-fill model A with current selection
+    if (selectedModel.value) compareModelA.value = selectedModel.value.id
+    compareMessagesA.value = []
+    compareMessagesB.value = []
+  }
+}
+
+function exitPlayground() {
+  compareMode.value = false
+  selectedModel.value = null
+}
+
+async function sendCompareMessage() {
+  const text = inputText.value.trim()
+  if (!text || !compareModelA.value || !compareModelB.value) return
+  if (!await requireLogin(t('models.actionChat'))) return
+
+  inputText.value = ''
+
+  // Add user message to both panels
+  compareMessagesA.value.push({ role: 'user', content: text })
+  compareMessagesB.value.push({ role: 'user', content: text })
+  const assistantA: ChatMessage = { role: 'assistant', content: '' }
+  const assistantB: ChatMessage = { role: 'assistant', content: '' }
+  compareMessagesA.value.push(assistantA)
+  compareMessagesB.value.push(assistantB)
+
+  const apiMessagesA: ChatMessage[] = []
+  const apiMessagesB: ChatMessage[] = []
+  if (systemPrompt.value) {
+    apiMessagesA.push({ role: 'system', content: systemPrompt.value })
+    apiMessagesB.push({ role: 'system', content: systemPrompt.value })
+  }
+  apiMessagesA.push(...compareMessagesA.value.slice(0, -1))
+  apiMessagesB.push(...compareMessagesB.value.slice(0, -1))
+
+  const platformToken = await getPlatformToken()
+
+  // Stream both in parallel
+  compareStreamingA.value = true
+  compareStreamingB.value = true
+
+  const scrollA = async () => { await nextTick(); if (compareElA.value) compareElA.value.scrollTop = compareElA.value.scrollHeight }
+  const scrollB = async () => { await nextTick(); if (compareElB.value) compareElB.value.scrollTop = compareElB.value.scrollHeight }
+
+  chatCompletionsStream(
+    { model: compareModelA.value, messages: apiMessagesA, temperature: temperature.value, max_tokens: maxTokens.value, top_p: topP.value, frequency_penalty: frequencyPenalty.value },
+    (chunk) => { assistantA.content += chunk; scrollA() },
+    () => { compareStreamingA.value = false; saveChatHistoryAuto() },
+    (err) => { assistantA.content = `Error: ${err.message}`; compareStreamingA.value = false },
+    platformToken ?? undefined
+  )
+
+  chatCompletionsStream(
+    { model: compareModelB.value, messages: apiMessagesB, temperature: temperature.value, max_tokens: maxTokens.value, top_p: topP.value, frequency_penalty: frequencyPenalty.value },
+    (chunk) => { assistantB.content += chunk; scrollB() },
+    () => { compareStreamingB.value = false; saveChatHistoryAuto() },
+    (err) => { assistantB.content = `Error: ${err.message}`; compareStreamingB.value = false },
+    platformToken ?? undefined
+  )
+}
+
+// ── Chat History (localStorage) ──────────────────────────────────
+interface ChatHistoryEntry {
+  id: string
+  title: string
+  model: string
+  messages: ChatMessage[]
+  systemPrompt: string
+  timestamp: number
+}
+
+const HISTORY_KEY = 'aitra_chat_history'
+const MAX_HISTORY = 20
+
+const chatHistoryList = ref<ChatHistoryEntry[]>([])
+
+function loadChatHistoryList() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    chatHistoryList.value = raw ? JSON.parse(raw) : []
+  } catch {
+    chatHistoryList.value = []
+  }
+}
+
+function saveChatHistoryAuto() {
+  if (compareMode.value) return // Don't auto-save compare sessions for now
+  if (messages.value.length < 2) return
+
+  const firstUserMsg = messages.value.find(m => m.role === 'user')
+  if (!firstUserMsg) return
+
+  const id = `chat_${Date.now()}`
+  const title = firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
+
+  // Check if we already have a recent entry for this conversation (same first message + model)
+  const existing = chatHistoryList.value.find(
+    h => h.model === selectedModel.value?.id && h.messages[0]?.content === firstUserMsg.content
+  )
+  if (existing) {
+    existing.messages = [...messages.value]
+    existing.timestamp = Date.now()
+  } else {
+    chatHistoryList.value.unshift({
+      id,
+      title,
+      model: selectedModel.value?.id ?? '',
+      messages: [...messages.value],
+      systemPrompt: systemPrompt.value,
+      timestamp: Date.now(),
+    })
+    // Trim to max
+    if (chatHistoryList.value.length > MAX_HISTORY) {
+      chatHistoryList.value = chatHistoryList.value.slice(0, MAX_HISTORY)
+    }
+  }
+
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistoryList.value))
+}
+
+function loadChatHistory(id: string) {
+  const entry = chatHistoryList.value.find(h => h.id === id)
+  if (!entry) return
+  // Find and select the model
+  const found = models.value.find(m => m.id === entry.model)
+  if (found) {
+    selectedModel.value = found
+  } else {
+    selectedModel.value = { id: entry.model, object: 'model', created: 0, owned_by: 'unknown' }
+  }
+  messages.value = [...entry.messages]
+  systemPrompt.value = entry.systemPrompt
+  compareMode.value = false
+}
+
+function deleteChatHistory(id: string) {
+  chatHistoryList.value = chatHistoryList.value.filter(h => h.id !== id)
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistoryList.value))
+}
+
+// Skills
+interface AISkill {
+  id: number
+  name: string
+  description: string
+  system_prompt: string
+  preferred_model: string
+  icon: string
+  welcome_message?: string
+  conversation_starters?: string[]
+  category?: string
+  usage_count?: number
+  tools?: any[]
+}
+const skills = ref<AISkill[]>([])
+const selectedSkillId = ref<number | null>(null)
+const activeSkill = ref<AISkill | null>(null)
+
+async function fetchSkills() {
+  try {
+    const res = await api.get<{ data: AISkill[] }>('/public/skills')
+    skills.value = res.data?.data ?? []
+  } catch {
+    skills.value = []
+  }
+}
+
+function onSkillChange(skillId: number | null) {
+  if (!skillId) {
+    systemPrompt.value = ''
+    activeSkill.value = null
+    return
+  }
+  const skill = skills.value.find(s => s.id === skillId)
+  if (skill) {
+    activeSkill.value = skill
+    systemPrompt.value = skill.system_prompt
+    // Show welcome message
+    if (skill.welcome_message) {
+      messages.value = [{ role: 'assistant', content: skill.welcome_message }]
+    } else {
+      messages.value = []
+    }
+    // Switch to preferred model
+    if (skill.preferred_model && models.value.length > 0) {
+      const found = models.value.find(m => m.id === skill.preferred_model || m.id.includes(skill.preferred_model))
+      if (found && selectedModel.value?.id !== found.id) {
+        selectedModel.value = found
+        selectedModelId.value = found.id
+      }
+    }
+  }
+}
 
 onMounted(async () => {
-  await fetchModels()
-  // Pre-select model from query param (coming from Model Hub)
+  loadChatHistoryList()
+  loadPromptTemplates()
+  await Promise.all([fetchModels(), fetchSkills()])
+  // Auto-select model: query param > localStorage > first available
   const modelPath = route.query.model as string
+  const lastModel = localStorage.getItem('last_model')
   if (modelPath && models.value.length > 0) {
     const found = models.value.find(m => m.id === modelPath || m.id.includes(modelPath.split('/')[1] ?? modelPath))
-    if (found) openPlayground(found)
-    else {
-      // Model from hub may not be in playground list — add it as a virtual entry
+    if (found) {
+      selectedModel.value = found
+      selectedModelId.value = found.id
+    } else {
       const parts = modelPath.split('/')
-      openPlayground({ id: parts[1] || modelPath, object: 'model', created: 0, owned_by: parts[0] || 'platform' })
+      const virtual = { id: parts[1] || modelPath, object: 'model', created: 0, owned_by: parts[0] || 'platform' }
+      selectedModel.value = virtual as any
+      selectedModelId.value = virtual.id
+    }
+  } else if (lastModel && models.value.find(m => m.id === lastModel)) {
+    const found = models.value.find(m => m.id === lastModel)!
+    selectedModel.value = found
+    selectedModelId.value = found.id
+  } else if (models.value.length > 0) {
+    selectedModel.value = models.value[0]
+    selectedModelId.value = models.value[0].id
+  }
+
+  // Auto-select skill from query param (from Skills page "Try it" button)
+  const skillParam = route.query.skill as string
+  if (skillParam && skills.value.length > 0) {
+    const skillId = parseInt(skillParam, 10)
+    if (!isNaN(skillId)) {
+      selectedSkillId.value = skillId
+      onSkillChange(skillId)
     }
   }
 })
@@ -502,19 +843,8 @@ async function getPlatformToken(): Promise<string | null> {
 async function fetchModels() {
   loadingModels.value = true
   try {
-    if (externalApi.enabled) {
-      let list: Model[] = []
-      try {
-        list = await fetchExternalModels(externalApi.baseUrl, externalApi.apiKey)
-      } catch { /* Fall back to manual list */ }
-      if (externalApi.manualModels) {
-        const manual = parseManualModels(externalApi.manualModels, externalApi.name)
-        const existing = new Set(list.map(m => m.id))
-        manual.forEach(m => { if (!existing.has(m.id)) list.push(m) })
-      }
-      models.value = list
-    } else {
-      // Load admin-configured platform models — public endpoint, no auth required
+    {
+      // Load platform models from admin-configured list
       const res = await api.get('/public/llm_configs')
       const publicModels: Array<{ model_name: string; provider: string; enabled: boolean }> = res.data?.data ?? []
       models.value = publicModels
@@ -553,7 +883,11 @@ function openPlayground(model: Model & { _external?: boolean }) {
   messages.value = []
 }
 
-function clearChat() { messages.value = [] }
+function clearChat() {
+  messages.value = []
+  compareMessagesA.value = []
+  compareMessagesB.value = []
+}
 
 async function sendMessage() {
   const text = inputText.value.trim()
@@ -571,15 +905,13 @@ async function sendMessage() {
   if (systemPrompt.value) apiMessages.push({ role: 'system', content: systemPrompt.value })
   apiMessages.push(...messages.value.slice(0, -1))
 
-  if (selectedModel.value._external) {
-    await streamExternal(assistantMsg, apiMessages)
-  } else {
-    // Get or auto-create platform API token for aigateway auth
+  {
+    // Platform API — get or auto-create token
     const platformToken = await getPlatformToken()
     chatCompletionsStream(
-      { model: selectedModel.value.id, messages: apiMessages, temperature: temperature.value, max_tokens: maxTokens.value },
+      { model: selectedModel.value.id, messages: apiMessages, temperature: temperature.value, max_tokens: maxTokens.value, top_p: topP.value, frequency_penalty: frequencyPenalty.value, ...(activeSkill.value ? { skill: activeSkill.value.name } : {}) },
       (chunk) => { assistantMsg.content += chunk; scrollToBottom() },
-      () => { streaming.value = false },
+      () => { streaming.value = false; saveChatHistoryAuto() },
       (err) => { assistantMsg.content = `Error: ${err.message}`; streaming.value = false },
       platformToken ?? undefined
     )
@@ -601,6 +933,7 @@ async function streamExternal(assistantMsg: ChatMessage, apiMessages: ChatMessag
         stream: true,
         max_tokens: maxTokens.value,
         temperature: temperature.value,
+        top_p: topP.value,
       }
     : {
         model: selectedModel.value!.id,
@@ -608,6 +941,8 @@ async function streamExternal(assistantMsg: ChatMessage, apiMessages: ChatMessag
         stream: true,
         temperature: temperature.value,
         max_tokens: maxTokens.value,
+        top_p: topP.value,
+        frequency_penalty: frequencyPenalty.value,
       }
 
   try {

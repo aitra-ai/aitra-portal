@@ -137,7 +137,7 @@ async function oauthLogin(provider: 'github' | 'google') {
     localStorage.setItem('jwt_token', jwt)
     localStorage.setItem('user_info', JSON.stringify({ username }))
     auth.$patch({ token: jwt as any, userInfo: { username } as any })
-    router.push("/")
+    router.push("/app/playground")
   } catch (err: any) {
     if (err?.message !== 'popup_closed') {
       errorMsg.value = err?.message || t('common.error')
@@ -154,7 +154,7 @@ async function handleLogin() {
     errorMsg.value = ''
     try {
       await auth.login(form)
-      router.push("/")
+      router.push("/app/playground")
     } catch {
       errorMsg.value = t('login.error')
     } finally {

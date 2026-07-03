@@ -20,16 +20,26 @@
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <!-- User area nav -->
         <template v-if="!isAdminArea">
-          <router-link
-            v-for="item in userNavItems"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-            active-class="bg-blue-600 text-white hover:bg-blue-600"
-          >
-            <el-icon :size="16"><component :is="item.icon" /></el-icon>
-            <span>{{ t(item.label) }}</span>
-          </router-link>
+          <template v-for="item in userNavItems" :key="item.to">
+            <a
+              v-if="item.external"
+              :href="item.to"
+              target="_blank"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <el-icon :size="16"><component :is="item.icon" /></el-icon>
+              <span>{{ t(item.label) }}</span>
+            </a>
+            <router-link
+              v-else
+              :to="item.to"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              active-class="bg-blue-600 text-white hover:bg-blue-600"
+            >
+              <el-icon :size="16"><component :is="item.icon" /></el-icon>
+              <span>{{ t(item.label) }}</span>
+            </router-link>
+          </template>
 
           <!-- Admin switch (only for admins) -->
           <template v-if="auth.isAdmin">
@@ -86,7 +96,7 @@
 
           <!-- Balance (user area only) -->
           <template v-if="!isAdminArea">
-            <div class="mb-2 px-1">
+            <router-link to="/app/billing" class="block mb-2 px-1 rounded-md hover:bg-slate-700/50 transition-colors cursor-pointer py-1 -mx-1 no-underline">
               <div v-if="balanceLoading" class="text-xs text-slate-500">{{ t('common.loadingBalance') }}</div>
               <div v-else class="flex items-center justify-between">
                 <span class="text-xs text-slate-400">{{ t('common.balance') }}</span>
@@ -94,14 +104,14 @@
                   ${{ balance.toFixed(4) }}
                 </span>
               </div>
-              <div class="mt-1 h-1 rounded-full bg-slate-700 overflow-hidden">
+              <div class="mt-1 h-1 rounded-full bg-slate-700 overflow-hidden" :title="monthlyBudget > 0 ? `$${monthlySpend.toFixed(2)} / $${monthlyBudget.toFixed(2)} this month` : ''">
                 <div
                   class="h-full rounded-full transition-all"
-                  :class="balance <= 1 ? 'bg-red-500' : 'bg-emerald-500'"
-                  :style="{ width: Math.min(100, (balance / 10) * 100) + '%' }"
+                  :class="budgetBarColor"
+                  :style="{ width: budgetPercent + '%' }"
                 />
               </div>
-            </div>
+            </router-link>
           </template>
 
           <el-button size="small" text class="!text-slate-400 !px-0 text-xs" @click="handleLogout">
@@ -143,6 +153,9 @@
         <router-view />
       </main>
     </div>
+
+    <!-- Onboarding for new users -->
+    <OnboardingDialog v-model="showOnboarding" />
   </div>
 </template>
 
@@ -152,10 +165,11 @@ import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api/index'
+import OnboardingDialog from '../components/OnboardingDialog.vue'
 import {
   SwitchButton, House, ChatDotRound, Key, Cpu,
-  DataAnalysis, Connection, Tools, Search, Monitor, Grid,
-  Setting, ArrowRight, ArrowLeft,
+  DataAnalysis, Connection, Tools, Search, Monitor, Grid, Link,
+  Setting, ArrowRight, ArrowLeft, Timer, Document, Wallet,
 } from '@element-plus/icons-vue'
 
 const { t, locale } = useI18n()
@@ -170,10 +184,12 @@ const isAdminArea = computed(() => route.path.startsWith('/admin'))
 
 // ─── User nav items ───────────────────────────────────────────────────────
 const userNavItems = [
+  { to: '/app/model-dashboard', label: 'nav.modelDashboard', icon: Grid },
   { to: '/app/playground', label: 'nav.playground', icon: ChatDotRound },
   { to: '/app/apikeys',    label: 'nav.apikeys',    icon: Key },
-  { to: '/app/deployments',label: 'nav.deployments',icon: Cpu },
-  { to: '/app/billing',    label: 'nav.usageStats', icon: DataAnalysis },
+  { to: '/app/billing',    label: 'nav.usage',      icon: DataAnalysis },
+  { to: '/docs',           label: 'nav.docs',       icon: Document, external: true },
+  { to: '/models',         label: 'nav.modelHub',   icon: Connection, external: true },
 ]
 
 // ─── Admin nav items ──────────────────────────────────────────────────────
@@ -182,12 +198,29 @@ const adminNavItems = [
   { to: '/admin/models',   label: 'nav.externalModels', icon: Connection },
   { to: '/admin/audit',    label: 'nav.usageAudit',     icon: Search },
   { to: '/admin/gpu',      label: 'nav.adminGPU',       icon: Monitor },
-  { to: '/admin/sandbox',  label: 'nav.adminSandbox',   icon: Grid },
+  { to: '/admin/mcp',          label: 'nav.adminMCP',        icon: Link },
+  { to: '/admin/skills',      label: 'nav.adminSkills',     icon: Cpu },
+  { to: '/admin/sandbox',      label: 'nav.adminSandbox',    icon: Grid },
+  { to: '/admin/rate-limits',  label: 'nav.adminRateLimits', icon: Timer },
+  { to: '/admin/credits',      label: 'nav.adminCredits',    icon: Wallet },
 ]
 
-// ─── Balance ──────────────────────────────────────────────────────────────
+// ─── Balance & Budget ─────────────────────────────────────────────────────
 const balance = ref(0)
+const monthlyBudget = ref(0)
+const monthlySpend = ref(0)
 const balanceLoading = ref(false)
+
+const budgetPercent = computed(() => {
+  if (monthlyBudget.value > 0) return Math.min(100, (monthlySpend.value / monthlyBudget.value) * 100)
+  return Math.min(100, (balance.value / 10) * 100)
+})
+
+const budgetBarColor = computed(() => {
+  if (budgetPercent.value >= 100) return 'bg-red-500'
+  if (budgetPercent.value >= 80) return 'bg-yellow-500'
+  return 'bg-emerald-500'
+})
 
 async function fetchBalance() {
   if (!auth.isLoggedIn) return
@@ -197,9 +230,26 @@ async function fetchBalance() {
     balance.value = res.data?.data?.balance_usd ?? 0
   } catch { balance.value = 0 }
   finally { balanceLoading.value = false }
+  // Also fetch budget
+  try {
+    const res = await api.get('/user/settings/budget')
+    const data = res.data?.data
+    if (data) {
+      monthlyBudget.value = data.monthly_budget_usd ?? 0
+      monthlySpend.value = data.current_spend_usd ?? 0
+    }
+  } catch { /* no budget set */ }
 }
 
-onMounted(fetchBalance)
+const showOnboarding = ref(false)
+
+onMounted(() => {
+  fetchBalance()
+  // Show onboarding for new users
+  if (auth.isLoggedIn && !localStorage.getItem(`onboarding_done_${auth.username}`)) {
+    showOnboarding.value = true
+  }
+})
 
 // ─── Misc ─────────────────────────────────────────────────────────────────
 const avatarLetter = computed(() =>

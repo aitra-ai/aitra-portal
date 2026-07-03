@@ -233,6 +233,19 @@
             @keyup.enter="handleCreate"
           />
         </el-form-item>
+        <el-form-item :label="t('apikeys.allowedModels')">
+          <el-select
+            v-model="createForm.allowedModels"
+            multiple
+            filterable
+            clearable
+            :placeholder="t('apikeys.allModelsAllowed')"
+            class="w-full"
+          >
+            <el-option v-for="m in availableModels" :key="m" :label="m" :value="m" />
+          </el-select>
+          <p class="text-xs text-gray-400 mt-1">{{ t('apikeys.allowedModelsHint') }}</p>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">{{ t('apikeys.cancel') }}</el-button>
@@ -262,15 +275,23 @@ const creating = ref(false)
 const showCreateDialog = ref(false)
 const newToken = ref<string | null>(null)
 
-const createForm = reactive({ name: '' })
+const createForm = reactive({ name: '', allowedModels: [] as string[] })
+const availableModels = ref<string[]>([])
 
-const API_BASE = `${window.location.protocol}//${window.location.host}/api/v1`
+async function fetchAvailableModels() {
+  try {
+    const res = await api.get('/public/llm_configs')
+    availableModels.value = (res.data?.data ?? []).filter((m: any) => m.enabled).map((m: any) => m.model_name)
+  } catch { /* ignore */ }
+}
+
+const AIGATEWAY_BASE = `${window.location.protocol}//${window.location.host}`
 
 const pythonExample = computed(() => `from openai import OpenAI
 
 client = OpenAI(
     api_key="YOUR_API_KEY",
-    base_url="${API_BASE}"
+    base_url="${AIGATEWAY_BASE}/v1"
 )
 
 response = client.chat.completions.create(
@@ -278,8 +299,6 @@ response = client.chat.completions.create(
     messages=[{"role": "user", "content": "Hello!"}]
 )
 print(response.choices[0].message.content)`)
-
-const AIGATEWAY_BASE = `${window.location.protocol}//${window.location.host}`
 
 const curlExample = computed(() => `curl ${AIGATEWAY_BASE}/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
@@ -289,13 +308,16 @@ const curlExample = computed(() => `curl ${AIGATEWAY_BASE}/v1/chat/completions \
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`)
 
-onMounted(fetchTokens)
+onMounted(() => {
+  fetchTokens()
+  fetchAvailableModels()
+})
 
 async function fetchTokens() {
   if (!auth.username) return
   loading.value = true
   try {
-    const res = await listTokens(auth.username, 'git')
+    const res = await listTokens(auth.username, 'aigateway')
     // API returns null when no tokens exist
     tokens.value = res.data?.data ?? []
   } catch {
@@ -310,7 +332,7 @@ async function handleCreate() {
   if (!createForm.name.trim()) return
   creating.value = true
   try {
-    const res = await createToken('git', createForm.name.trim())
+    const res = await createToken('aigateway', createForm.name.trim(), undefined, createForm.allowedModels)
     const data = res.data?.data ?? (res.data as any)
     const token = data?.token
     if (token) {
@@ -319,6 +341,7 @@ async function handleCreate() {
       ElMessage.warning('Key created but token not returned — check existing keys')
     }
     createForm.name = ''
+    createForm.allowedModels = []
     showCreateDialog.value = false
     await fetchTokens()
   } catch (e: any) {
@@ -331,7 +354,7 @@ async function handleCreate() {
 
 async function deleteKey(row: Token) {
   try {
-    await deleteToken('git', row.token_name)
+    await deleteToken('aigateway', row.token_name)
     ElMessage.success(t('apikeys.deleteSuccess'))
     await fetchTokens()
   } catch {

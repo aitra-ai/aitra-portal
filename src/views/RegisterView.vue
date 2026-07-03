@@ -175,7 +175,7 @@ async function oauthLogin(provider: 'github' | 'google') {
     localStorage.setItem('jwt_token', jwt)
     localStorage.setItem('user_info', JSON.stringify({ username }))
     auth.$patch({ token: jwt as any, userInfo: { username } as any })
-    router.push("/")
+    router.push("/app/playground")
   } catch (err: any) {
     if (err?.message !== 'popup_closed') {
       ElMessage.error(err?.message || t('common.error'))

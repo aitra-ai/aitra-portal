@@ -61,7 +61,7 @@ onMounted(() => {
     localStorage.setItem('jwt_token', jwt as string)
     localStorage.setItem('user_info', JSON.stringify({ username }))
     auth.$patch({ token: jwt as any, userInfo: { username } as any })
-    router.replace('/app/models')
+    router.replace('/app/playground')
   } catch {
     error.value = 'Failed to parse authentication token'
   }
